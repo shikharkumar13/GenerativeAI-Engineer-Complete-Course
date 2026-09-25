@@ -70,10 +70,10 @@ Bridging machine learning into generative AI — the concepts every later phase 
  
 | # | Topic | Format | Article | Video |
 | --- | --- | --- | --- | --- |
-| 01 | **What is Generative AI**<br>Discriminative vs. generative models, types of GenAI, real-world use cases | `Theory` | *Coming soon* | *Coming soon* |
-| 02 | **The Transformer architecture**<br>Why transformers replaced RNNs, self-attention intuition, encoder vs. decoder | `Theory` | *Coming soon* | *Coming soon* |
-| 03 | **Tokenization explained**<br>BPE, WordPiece, SentencePiece, building a tokenizer from scratch, token costs | `Hands-on` | *Coming soon* | *Coming soon* |
-| 04 | **Embeddings from scratch**<br>Word2Vec intuition, sentence embeddings, visualizing embedding space | `Hands-on` | *Coming soon* | *Coming soon* |
+| 01 | **What is Generative AI**<br>Discriminative vs. generative models, types of GenAI, real-world use cases | `Theory` | [Article 1](https://shikharkumar13.github.io/GenerativeAI-Engineer-Complete-Course/1.%20What%20is%20Generative%20Ai.html) | *Coming soon* |
+| 02 | **The Transformer architecture**<br>Why transformers replaced RNNs, self-attention intuition, encoder vs. decoder | `Theory` | [Article 2](https://shikharkumar13.github.io/GenerativeAI-Engineer-Complete-Course/2.%20Transformers%20(Architecture%20behind%20every%20LLM)%20.html) | *Coming soon* |
+| 03 | **Tokenization explained**<br>BPE, WordPiece, SentencePiece, building a tokenizer from scratch, token costs | `Hands-on` | [Article 3](https://shikharkumar13.github.io/GenerativeAI-Engineer-Complete-Course/3.%20Tokenization%20-%20How%20text%20becomes%20numbers.html) | *Coming soon* |
+| 04 | **Embeddings from scratch**<br>Word2Vec intuition, sentence embeddings, visualizing embedding space | `Hands-on` | [Article 4](https://shikharkumar13.github.io/GenerativeAI-Engineer-Complete-Course/4.%20Embeddings%20from%20scratch.html) | *Coming soon* |
 | 05 | **Attention mechanism deep dive**<br>Query/Key/Value, multi-head attention, positional encoding | `Theory` | *Coming soon* | *Coming soon* |
 | 06 | **Prompt engineering basics**<br>Zero-shot vs. few-shot, chain-of-thought, temperature/top-p/top-k | `Hands-on` | *Coming soon* | *Coming soon* |
  
