@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Embeddings from Scratch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F3F5F4;
+  --surface:#FFFFFF;
+  --surface-sunk:#E9EDEB;
+  --ink:#101C19;
+  --ink-soft:#33443F;
+  --muted:#5C6B66;
+  --rule:#D2DAD7;
+  --rule-strong:#B4C0BC;
+  --accent:#0E6E62;
+  --accent-bright:#2A9D8F;
+  --accent-wash:#E2EFEC;
+  --gain:#1B6B4C;
+  --gain-wash:#E3EFE8;
+  --loss:#B23A26;
+  --amber:#8A5E0F;
+  --amber-wash:#F6EEDC;
+  --loss-wash:#F8E8E4;
+  --c-kw:#0E6E62; --c-fn:#1F5B7A; --c-st:#8A5E0F; --c-cm:#7A8984; --c-nm:#B23A26; --c-out:#1B6B4C;
+
+  --display:"Newsreader",Georgia,"Times New Roman",serif;
+  --body:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --measure:91ch;
+  --wide:1080px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1412; --surface:#141D1A; --surface-sunk:#101816;
+    --ink:#E2E9E6; --ink-soft:#BAC7C2; --muted:#8A9B95;
+    --rule:#243330; --rule-strong:#354844;
+    --accent:#5AC9B6; --accent-bright:#6FD8C4; --accent-wash:#132824;
+    --gain:#54B98C; --gain-wash:#10231B; --loss:#E38270; --amber:#D9A94E; --amber-wash:#251E10; --loss-wash:#261715;
+    --c-kw:#5AC9B6; --c-fn:#7FB8D8; --c-st:#D9A94E; --c-cm:#7A8C86; --c-nm:#E38270; --c-out:#54B98C;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1412; --surface:#141D1A; --surface-sunk:#101816;
+  --ink:#E2E9E6; --ink-soft:#BAC7C2; --muted:#8A9B95;
+  --rule:#243330; --rule-strong:#354844;
+  --accent:#5AC9B6; --accent-bright:#6FD8C4; --accent-wash:#132824;
+  --gain:#54B98C; --gain-wash:#10231B; --loss:#E38270; --amber:#D9A94E; --amber-wash:#251E10; --loss-wash:#261715;
+  --c-kw:#5AC9B6; --c-fn:#7FB8D8; --c-st:#D9A94E; --c-cm:#7A8C86; --c-nm:#E38270; --c-out:#54B98C;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- shell ---------- */
+.shell{display:block}
+@media (min-width:1080px){
+  .shell{display:grid;grid-template-columns:248px minmax(0,1fr);align-items:start}
+}
+
+/* ---------- contents rail ---------- */
+.rail{border-bottom:1px solid var(--rule);background:var(--surface);padding:16px}
+.rail-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.rail nav{display:none}
+.rail[data-open="true"] nav{display:block;margin-top:12px}
+.rail-toggle{display:block;width:100%;text-align:left;background:none;border:1px solid var(--rule-strong);border-radius:2px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:8px 10px;cursor:pointer}
+.rail-toggle:hover{border-color:var(--accent)}
+@media (min-width:1080px){
+  .rail{position:sticky;top:0;height:100dvh;overflow-y:auto;border-bottom:none;border-right:1px solid var(--rule);padding:28px 20px 40px}
+  .rail nav{display:block}
+  .rail-toggle{display:none}
+}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.rail li{margin:0}
+.rail a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--ink-soft);font-size:13.5px;line-height:1.35;padding:5px 6px;border-radius:2px}
+.rail a:hover,.rail a.on{background:var(--accent-wash);color:var(--accent)}
+.rail a .n{font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:1.6em;font-variant-numeric:tabular-nums}
+.rail .sub a{font-size:12.5px;color:var(--muted)}
+.rail hr{border:0;border-top:1px solid var(--rule);margin:14px 0 10px}
+.theme-btn{margin-top:18px;background:none;border:1px solid var(--rule-strong);border-radius:2px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:6px 10px;cursor:pointer;width:100%;text-align:left}
+.theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- content ---------- */
+.content{padding-inline:clamp(16px,5vw,56px);padding-block:0 96px;min-width:0}
+.content > *{max-width:var(--measure);margin-inline:auto}
+.content > .wide{max-width:var(--wide)}
+section > *{max-width:100%}
+section{scroll-margin-top:12px}
+section + section{border-top:1px solid var(--rule);margin-top:64px}
+section > h2:first-child{margin-top:48px}
+#terms,#exercise,#next{scroll-margin-top:12px}
+
+/* ---------- masthead ---------- */
+.masthead{max-width:var(--wide);padding-block:clamp(40px,7vw,76px) 34px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:500;font-size:clamp(2.3rem,6.2vw,4rem);line-height:1.03;letter-spacing:-.022em;margin:0 0 20px;text-wrap:balance}
+.standfirst{font-family:var(--display);font-size:clamp(1.08rem,2.4vw,1.32rem);line-height:1.55;color:var(--ink-soft);max-width:60ch;margin:0}
+.byline{margin-top:24px;font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 18px}
+
+/* ---------- key figures strip ---------- */
+.figures{max-width:var(--wide);display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border-bottom:1px solid var(--rule);margin:0 auto 48px}
+.figures div{padding:18px 20px 20px;border-right:1px solid var(--rule)}
+.figures div:last-child{border-right:none}
+.figures dt{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.figures dd{margin:0;font-family:var(--display);font-size:1.75rem;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.01em}
+.figures dd small{display:block;font-family:var(--body);font-size:11.5px;color:var(--muted);margin-top:5px;letter-spacing:0;line-height:1.4}
+@media (max-width:620px){.figures div{border-right:none;border-bottom:1px solid var(--rule)}.figures div:last-child{border-bottom:none}}
+
+/* ---------- typography ---------- */
+h2{font-family:var(--display);font-weight:500;font-size:clamp(1.7rem,3.6vw,2.4rem);line-height:1.12;letter-spacing:-.018em;margin:72px 0 6px;text-wrap:balance}
+h2 .part{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;font-weight:500}
+h3{font-family:var(--display);font-weight:600;font-size:1.26rem;line-height:1.25;letter-spacing:-.008em;margin:40px 0 4px;text-wrap:balance}
+h4{font-family:var(--mono);font-weight:600;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:30px 0 4px}
+p{margin:14px 0}
+a{color:var(--accent)}
+strong{font-weight:600}
+em{font-style:italic}
+code{font-family:var(--mono);font-size:.86em;background:var(--surface-sunk);padding:1px 5px;border-radius:2px;border:1px solid var(--rule)}
+ul,ol{margin:14px 0;padding-left:1.25em}
+li{margin:7px 0}
+li::marker{color:var(--accent)}
+hr.sep{border:0;border-top:1px solid var(--rule);margin:56px auto;max-width:var(--measure)}
+.lede{font-size:1.06rem;color:var(--ink-soft)}
+
+/* ---------- callouts ---------- */
+.trap,.note,.aside,.yt{border-left:3px solid;padding:16px 18px;margin:26px 0;border-radius:0 2px 2px 0}
+.trap{border-color:var(--loss);background:var(--loss-wash)}
+.note{border-color:var(--amber);background:var(--amber-wash)}
+.aside{border-color:var(--accent);background:var(--accent-wash)}
+.yt{border-color:var(--rule-strong);background:var(--surface-sunk);font-size:14.5px;color:var(--ink-soft)}
+.label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:7px;font-weight:600}
+.trap .label{color:var(--loss)}
+.note .label{color:var(--amber)}
+.aside .label{color:var(--accent)}
+.yt .label{color:var(--muted)}
+.trap p:first-of-type,.note p:first-of-type,.aside p:first-of-type{margin-top:0}
+.trap p:last-child,.note p:last-child,.aside p:last-child{margin-bottom:0}
+blockquote.quote{margin:24px 0;padding:6px 0 6px 20px;border-left:2px solid var(--rule-strong);font-family:var(--display);font-style:italic;font-size:1.25rem;line-height:1.45;color:var(--ink-soft)}
+.big-idea{font-family:var(--display);font-size:1.4rem;line-height:1.35;letter-spacing:-.01em;color:var(--ink);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:18px 0;margin:30px 0;text-wrap:balance}
+.big-idea::before{content:"Key idea";display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+
+/* ---------- exhibits (figures stay on paper in both themes) ---------- */
+.exhibit{margin:34px auto;border:1px solid var(--rule);background:#FCFDFC;border-radius:2px;overflow:hidden}
+.exhibit .head{padding:11px 16px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:#5C6B66;background:#F1F4F3;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.exhibit .body{padding:20px 16px;overflow-x:auto;color:#101C19}
+.exhibit .body svg{display:block;width:100%;height:auto;max-width:100%}
+.exhibit figcaption{padding:12px 16px;border-top:1px solid var(--rule);font-size:13px;color:#4A5A55;background:#F1F4F3;line-height:1.5}
+.swipe{display:none}
+@media (max-width:620px){
+  .exhibit .body svg{min-width:600px}
+  .swipe{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:#5C6B66;padding:0 16px 10px;background:#FCFDFC}
+}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;margin:26px 0;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:440px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule-strong)}
+tbody tr:last-child td{border-bottom:none}
+td.k{font-weight:600}
+.terms td.k{white-space:nowrap}
+tr.hi td{background:var(--accent-wash)}
+
+/* ---------- code ---------- */
+.codewrap{margin:22px 0;border:1px solid var(--rule);border-radius:2px;overflow:hidden;background:var(--surface-sunk)}
+.codehead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);background:var(--surface)}
+.codewrap pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--ink);white-space:pre}
+.kw{color:var(--c-kw);font-weight:500}.fn{color:var(--c-fn)}.st{color:var(--c-st)}.cm{color:var(--c-cm);font-style:italic}.nm{color:var(--c-nm)}.out{color:var(--c-out)}.pmt{color:var(--muted);font-weight:600}.var{color:var(--ink)}.dec{color:var(--c-fn)}
+
+/* ---------- stat strip inside the article ---------- */
+.param-row{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:2px;background:var(--surface);margin:26px 0}
+.param-card{padding:16px 18px;border-right:1px solid var(--rule)}
+.param-card:last-child{border-right:none}
+.param-value{display:block;font-family:var(--display);font-size:1.7rem;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums}
+.param-label{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+.param-label strong{color:var(--ink)}
+
+/* ---------- before / after and two-view cards ---------- */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 10px}
+.ba > div{border:1px solid var(--rule);background:var(--surface);padding:14px 16px;border-radius:2px;font-size:14.5px;line-height:1.55}
+.ba .before{border-top:2px solid var(--loss)}
+.ba .after{border-top:2px solid var(--gain)}
+.ba .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:6px;font-weight:600}
+.ba .before .tag{color:var(--loss)}
+.ba .after .tag{color:var(--gain)}
+.other-uses{font-size:14px;color:var(--muted);margin-top:6px}
+
+/* ---------- roadmap ---------- */
+.roadmap{margin:26px 0;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+.phase{display:grid;grid-template-columns:132px 1fr;border-bottom:1px solid var(--rule)}
+.phase:last-child{border-bottom:none}
+.phase-tag{padding:14px 16px;font-family:var(--mono);border-right:1px solid var(--rule)}
+.phase-tag b{display:block;font-size:11px;letter-spacing:.12em;color:var(--accent);font-weight:600}
+.phase-tag span{display:block;font-size:10.5px;color:var(--muted);margin-top:3px}
+.phase-body{padding:13px 16px;font-size:14px;line-height:1.55;color:var(--ink-soft)}
+.phase-body strong{display:block;font-family:var(--display);font-size:1.08rem;font-weight:600;color:var(--ink);margin-bottom:3px}
+.phase.current{background:var(--accent-wash);box-shadow:inset 3px 0 0 var(--accent)}
+.here{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent);padding:1px 6px;border-radius:2px;margin-left:8px;vertical-align:3px;font-weight:600}
+
+/* ---------- boxes ---------- */
+.pathbox{border:1px solid var(--rule-strong);background:var(--surface);padding:18px 20px;margin:28px 0;border-radius:2px}
+.pathbox h4{margin-top:0}
+.pathbox ol,.pathbox ul{margin-bottom:0}
+.summary{border-top:2px solid var(--accent)}
+.summary li{font-size:15px}
+.decision{border:1px solid var(--rule);border-top:2px solid var(--accent);background:var(--surface);padding:18px 20px;margin:26px 0;border-radius:0 0 2px 2px}
+.decision .id{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);font-weight:600;text-transform:uppercase}
+.decision h5{font-family:var(--display);font-size:1.35rem;font-weight:600;margin:5px 0 10px;line-height:1.25}
+.decision p{margin:8px 0;color:var(--ink-soft)}
+
+footer{max-width:var(--wide);margin:80px auto 0;padding-top:24px;border-top:2px solid var(--ink);font-size:13px;color:var(--muted)}
+footer a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:620px){
+  .param-row,.ba{grid-template-columns:1fr}
+  .param-card{border-right:none;border-bottom:1px solid var(--rule)}
+  .param-card:last-child{border-bottom:none}
+  .phase{grid-template-columns:1fr}
+  .phase-tag{border-right:none;border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:baseline;padding:10px 16px}
+  .phase-tag span{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="rail" id="rail">
+  <p class="rail-title">Contents</p>
+  <button class="rail-toggle" id="railToggle" aria-expanded="false" aria-controls="railNav">Show contents</button>
+  <nav id="railNav">
+    <ol>
+      <li><a href="#s1"><span class="n">01</span><span>The magic of semantic similarity</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>Meaning as geometry</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Word2Vec: where it began</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>From words to sentences</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Hands-on: sentence-transformers</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Hands-on: OpenAI embeddings</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>Seeing embedding space</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Choosing a model</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Summary</span></a></li>
+    </ol>
+    <hr>
+    <ol class="sub">
+      <li><a href="#prev"><span class="n">←</span><span>Previously: Article #03</span></a></li>
+      <li><a href="#exercise"><span class="n">§</span><span>Learner exercise</span></a></li>
+      <li><a href="#next"><span class="n">→</span><span>Next: Article #05</span></a></li>
+    </ol>
+    <button class="theme-btn" id="themeBtn" type="button">Theme: auto</button>
+  </nav>
+</aside>
+
+<main class="content">
+
+<header class="masthead">
+  <p class="eyebrow">Generative AI Engineer Series · Article 04 · Phase 1: Foundations</p>
+  <h1>Embeddings from Scratch</h1>
+  <p class="standfirst">How language models turn meaning into geometry, why "puppy" ends up near "dog" without anyone saying so, and how that one idea powers semantic search, RAG, and everything we build in Phases 3 and 5.</p>
+  <p class="byline">
+    <span>~25 min read</span>
+    <span>6 figures</span>
+    <span>Every score measured, not made up</span>
+    <span>Prerequisites: Articles #01 to #03</span>
+  </p>
+</header>
+
+<dl class="figures">
+  <div><dt>all-MiniLM-L6-v2</dt><dd>384<small>numbers per sentence, from a free 90 MB model</small></dd></div>
+  <div><dt>Zero shared words</dt><dd>0.547 vs 0.048<small>"dog chased cat" vs "puppy ran after kitten", and vs "stock market crashed"</small></dd></div>
+  <div><dt>Vector arithmetic</dt><dd>king − man + woman<small>nearest word: queen (in real GloVe vectors)</small></dd></div>
+  <div><dt>…and closer to home</dt><dd>Delhi − India + Japan<small>nearest word: Tokyo</small></dd></div>
+</dl>
+
+  <section id="s1">
+    <h2><span class="part">§ 01 · Hook</span>The Magic of Semantic Similarity</h2>
+
+    <div class="aside" id="prev">
+      <span class="label">Where we left off</span>
+      <p><strong>Article #03</strong> turned text into token IDs. But an ID is just a row number: token 496 isn't "closer" to token 497 in any meaningful way. <strong>Article #02</strong> showed the next step, where each ID is swapped for a vector from an embedding table, and <strong>Article #01</strong> (§04) promised embeddings would get an article of their own. This is it: how those vectors come to capture meaning, and what you can build once they do.</p>
+    </div>
+
+    <p>Run this code:</p>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>run this first</span></div><pre><span class="kw">from</span> sentence_transformers <span class="kw">import</span> SentenceTransformer
+<span class="kw">from</span> sklearn.metrics.pairwise <span class="kw">import</span> cosine_similarity
+
+model = <span class="fn">SentenceTransformer</span>(<span class="st">"all-MiniLM-L6-v2"</span>)
+
+sentences = [
+    <span class="st">"The dog chased the cat"</span>,
+    <span class="st">"A puppy ran after a kitten"</span>,
+    <span class="st">"The stock market crashed today"</span>,
+]
+
+emb = model.<span class="fn">encode</span>(sentences)
+sim = <span class="fn">cosine_similarity</span>(emb)
+
+<span class="fn">print</span>(<span class="st">f"Sentences 1 &amp; 2: {sim[0][1]:.3f}"</span>)   <span class="out"># 0.547</span>
+<span class="fn">print</span>(<span class="st">f"Sentences 1 &amp; 3: {sim[0][2]:.3f}"</span>)   <span class="out"># 0.048</span></pre></div>
+
+    <p>Sentences 1 and 2 score <strong>0.547</strong>. Sentences 1 and 3 score <strong>0.048</strong>, more than ten times lower and close to zero. Here's the part that should make you stop: sentences 1 and 2 share <em>no words at all</em>. "Dog" and "puppy" are different words. "Chased" and "ran after" are different phrases. "Cat" and "kitten" are different tokens. Yet the model clearly places them together, and places the stock market somewhere else entirely.</p>
+
+    <p>The mechanism behind this is <strong>embeddings</strong>: a way of turning meaning into geometry. It's not a niche academic idea. Embeddings sit underneath semantic search engines, every RAG system we'll build in Phase 5, and every vector database in Phase 3. They're also how the Transformer from Article #02 represents every token internally.</p>
+
+    <div class="note">
+      <span class="label">About the numbers in this article</span>
+      <p>Every similarity score here was produced by actually running <code>all-MiniLM-L6-v2</code>, and the word-arithmetic examples by running real GloVe word vectors. Your results may differ in the third decimal place across library versions and hardware, but the rankings won't change. And remember that the absolute size of a score depends on the model: another model might give the same pair 0.8. What matters is which pairs score <em>higher than</em> which.</p>
+    </div>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Run this code live and print the scores. Pause on them. Say: "The model has never been told these sentences are similar. It worked it out from reading a huge amount of text. How?" Let the question sit before moving on.
+    </div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="part">§ 02 · The Core Idea</span>Meaning as Geometry</h2>
+
+    <p>An embedding is a <strong>dense vector</strong> (Article #02, §03: a list of decimal numbers where nearly every position carries information) that represents the meaning of a piece of text. Typical sizes run from a few hundred to a few thousand numbers. Every word, sentence, or document can be mapped to a point in this high-dimensional space.</p>
+
+    <p>Nobody can picture 384 dimensions, and that's fine; the researchers who build these models can't either (notice that §07 flattens everything to 2D just to put it on a screen). What matters is that distance and direction work the same way in 384 dimensions as on a sheet of paper. One helpful way to think about it: each dimension is roughly one more question the model has learned to answer about the text. Is it formal or casual? Technical or everyday? About a place or a person? Positive or negative? There are hundreds of these "questions" layered together, each adding one coordinate, and in reality no single dimension lines up neatly with one human idea the way "formality" does in this simplified picture.</p>
+
+    <p class="big-idea">Similar meanings land at nearby points. Distance in this space is semantic distance.</p>
+
+    <p>Here's what that looks like in real word vectors (GloVe, 100 dimensions):</p>
+    <ul>
+      <li>"king" and "queen" score <strong>0.75</strong>. "king" and "carrot" score <strong>0.09</strong>.</li>
+      <li>"Paris" relates to "France" the way "Berlin" relates to "Germany": the country-to-capital relationship is a consistent <em>direction</em> in space.</li>
+      <li>The most famous consequence: <strong>king − man + woman ≈ queen</strong>. You can do arithmetic on meaning.</li>
+    </ul>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>arithmetic on meaning (GloVe vectors via gensim)</span></div><pre><span class="kw">import</span> gensim.downloader <span class="kw">as</span> api
+kv = api.<span class="fn">load</span>(<span class="st">"glove-wiki-gigaword-100"</span>)   <span class="cm"># ~130 MB, downloaded once</span>
+
+<span class="fn">print</span>(kv.<span class="fn">most_similar</span>(positive=[<span class="st">"king"</span>, <span class="st">"woman"</span>], negative=[<span class="st">"man"</span>], topn=<span class="nm">1</span>))
+<span class="out"># [('queen', 0.7698...)]</span>
+
+<span class="fn">print</span>(kv.<span class="fn">most_similar</span>(positive=[<span class="st">"paris"</span>, <span class="st">"germany"</span>], negative=[<span class="st">"france"</span>], topn=<span class="nm">1</span>))
+<span class="out"># [('berlin', 0.8846...)]</span>
+
+<span class="fn">print</span>(kv.<span class="fn">most_similar</span>(positive=[<span class="st">"delhi"</span>, <span class="st">"japan"</span>], negative=[<span class="st">"india"</span>], topn=<span class="nm">1</span>))
+<span class="out"># [('tokyo', 0.8396...)]</span></pre></div>
+
+    <p>This isn't hand-waving. Subtract one vector from another, add a third, and the nearest word in the whole vocabulary really is "queen", or "berlin", or "tokyo". Direction in space encodes relationships.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 1</span><span>Meaning as geometry, in real word vectors</span></div><div class="body"><svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="f1a" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2A9D8F"/></marker><marker id="f1g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5B4A8A"/></marker></defs><rect x="40" y="24" width="500" height="350" rx="3" fill="#FCFDFC" stroke="#D2DAD7"/><line x1="145.0" y1="270.6" x2="165.9" y2="258.4" stroke="#2A9D8F" stroke-width="1.6" marker-end="url(#f1a)"/><line x1="92.6" y1="157.8" x2="137.7" y2="167.5" stroke="#2A9D8F" stroke-width="1.6" marker-end="url(#f1a)"/><line x1="150.7" y1="153.8" x2="177.2" y2="164.4" stroke="#2A9D8F" stroke-width="1.6" marker-end="url(#f1a)"/><line x1="119.1" y1="58.3" x2="124.7" y2="60.3" stroke="#2A9D8F" stroke-width="1.6" marker-end="url(#f1a)"/><line x1="366.7" y1="199.5" x2="387.0" y2="199.5" stroke="#5B4A8A" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#f1g)"/><line x1="339.6" y1="347.8" x2="360.5" y2="339.2" stroke="#5B4A8A" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#f1g)"/><circle cx="339.6" cy="347.8" r="5" fill="#5B4A8A" stroke="#fff" stroke-width="1"/><text x="331.6" y="339.8" text-anchor="end" font-size="11" fill="#101C19">king</text><circle cx="360.5" cy="339.2" r="5" fill="#5B4A8A" stroke="#fff" stroke-width="1"/><text x="366.5" y="355.2" text-anchor="start" font-size="11" fill="#101C19">queen</text><circle cx="366.7" cy="199.5" r="5" fill="#5B4A8A" stroke="#fff" stroke-width="1"/><text x="360.7" y="190.5" text-anchor="end" font-size="11" fill="#101C19">man</text><circle cx="387.0" cy="199.5" r="5" fill="#5B4A8A" stroke="#fff" stroke-width="1"/><text x="395.0" y="190.5" text-anchor="start" font-size="11" fill="#101C19">woman</text><circle cx="316.5" cy="350.3" r="5" fill="#5B4A8A" stroke="#fff" stroke-width="1"/><text x="306.5" y="364.3" text-anchor="end" font-size="11" fill="#101C19">prince</text><circle cx="376.9" cy="323.9" r="5" fill="#5B4A8A" stroke="#fff" stroke-width="1"/><text x="384.9" y="315.9" text-anchor="start" font-size="11" fill="#101C19">princess</text><circle cx="455.3" cy="104.0" r="5" fill="#8A5E0F" stroke="#fff" stroke-width="1"/><text x="447.3" y="116.0" text-anchor="end" font-size="11" fill="#101C19">cat</text><circle cx="466.6" cy="85.2" r="5" fill="#8A5E0F" stroke="#fff" stroke-width="1"/><text x="474.6" y="97.2" text-anchor="start" font-size="11" fill="#101C19">dog</text><circle cx="485.7" cy="65.9" r="5" fill="#8A5E0F" stroke="#fff" stroke-width="1"/><text x="493.7" y="69.9" text-anchor="start" font-size="11" fill="#101C19">puppy</text><circle cx="451.3" cy="65.4" r="5" fill="#8A5E0F" stroke="#fff" stroke-width="1"/><text x="443.3" y="57.4" text-anchor="end" font-size="11" fill="#101C19">kitten</text><circle cx="145.0" cy="270.6" r="5" fill="#0E6E62" stroke="#fff" stroke-width="1"/><text x="137.0" y="262.6" text-anchor="end" font-size="11" fill="#101C19">france</text><circle cx="92.6" cy="157.8" r="5" fill="#0E6E62" stroke="#fff" stroke-width="1"/><text x="84.6" y="149.8" text-anchor="end" font-size="11" fill="#101C19">germany</text><circle cx="150.7" cy="153.8" r="5" fill="#0E6E62" stroke="#fff" stroke-width="1"/><text x="142.7" y="145.8" text-anchor="end" font-size="11" fill="#101C19">india</text><circle cx="119.1" cy="58.3" r="5" fill="#0E6E62" stroke="#fff" stroke-width="1"/><text x="111.1" y="50.3" text-anchor="end" font-size="11" fill="#101C19">japan</text><circle cx="165.9" cy="258.4" r="5" fill="#2A9D8F" stroke="#fff" stroke-width="1"/><text x="173.9" y="270.4" text-anchor="start" font-size="11" fill="#101C19">paris</text><circle cx="137.7" cy="167.5" r="5" fill="#2A9D8F" stroke="#fff" stroke-width="1"/><text x="145.7" y="179.5" text-anchor="start" font-size="11" fill="#101C19">berlin</text><circle cx="177.2" cy="164.4" r="5" fill="#2A9D8F" stroke="#fff" stroke-width="1"/><text x="185.2" y="176.4" text-anchor="start" font-size="11" fill="#101C19">delhi</text><circle cx="124.7" cy="60.3" r="5" fill="#2A9D8F" stroke="#fff" stroke-width="1"/><text x="132.7" y="74.3" text-anchor="start" font-size="11" fill="#101C19">tokyo</text><text x="556" y="44" font-size="11" font-weight="700" fill="#101C19">Clusters</text><circle cx="562" cy="64" r="5" fill="#5B4A8A"/><text x="572" y="68" font-size="11" fill="#101C19">people &amp; royalty</text><circle cx="562" cy="84" r="5" fill="#8A5E0F"/><text x="572" y="88" font-size="11" fill="#101C19">animals</text><circle cx="562" cy="104" r="5" fill="#0E6E62"/><text x="572" y="108" font-size="11" fill="#101C19">countries</text><circle cx="562" cy="124" r="5" fill="#2A9D8F"/><text x="572" y="128" font-size="11" fill="#101C19">capitals</text><line x1="556" y1="160" x2="580" y2="160" stroke="#2A9D8F" stroke-width="1.6" marker-end="url(#f1a)"/><text x="586" y="164" font-size="10.5" fill="#101C19">country → capital</text><line x1="556" y1="182" x2="580" y2="182" stroke="#5B4A8A" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#f1g)"/><text x="586" y="186" font-size="10.5" fill="#101C19">male → female</text><text x="556" y="222" font-size="10.5" fill="#33443F"><tspan x="556">In the full 100 dimensions,</tspan><tspan x="556" dy="15">paris − france and</tspan><tspan x="556" dy="15">berlin − germany point the</tspan><tspan x="556" dy="15">same way (cosine 0.78).</tspan><tspan x="556" dy="15">A random pair scores −0.08.</tspan></text><text x="556" y="320" font-size="10" fill="#5C6B66"><tspan x="556">Flattening to 2D bends</tspan><tspan x="556" dy="14">the arrows a little.</tspan></text><text x="290" y="392" text-anchor="middle" font-size="10.5" fill="#5C6B66">Real GloVe word vectors (100 dimensions), projected to 2D with PCA.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Related words cluster together, and the country → capital arrows all point roughly the same way. That shared direction is what makes the arithmetic above work.</figcaption></figure>
+
+    <h3>Why engineers care</h3>
+
+    <p>Embeddings turn a fuzzy problem, "find things that <em>mean</em> the same as this query", into a precise geometric one: find the nearest points in a vector space. No keyword matching, no SQL <code>LIKE</code>, no hand-written synonym lists. Just geometry.</p>
+
+    <p>That's exactly what a vector database stores (Phase 3) and what RAG uses to fetch relevant context (Phase 5). Remember the open-book exam from Article #01, §15? Embeddings are how the system finds the right pages of the book.</p>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Open the TensorFlow Embedding Projector at projector.tensorflow.org. Zoom into the cluster of animals, then zoom out to the countries. Say: "Nobody told the model that 'dog' and 'cat' are related. It learned it purely from which words appear near each other in text."
+    </div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="part">§ 03 · The Foundation</span>Word2Vec: Where Modern Embeddings Began</h2>
+
+    <p>In 2013, researchers at Google published <strong>Word2Vec</strong>, the method that showed word embeddings could be learned at scale. You don't need to implement it, but its core idea answers a question intuition alone can't: <em>why</em> do embeddings work at all?</p>
+
+    <h3>The distributional hypothesis</h3>
+
+    <p>Word2Vec rests on an old idea from linguistics, summed up by J. R. Firth in 1957: <em>"You shall know a word by the company it keeps."</em> Words that appear in similar contexts tend to have similar meanings.</p>
+
+    <p>Take two sentences: <em>"The <strong>cat</strong> sat on the mat."</em> and <em>"The <strong>dog</strong> sat on the rug."</em> "cat" and "dog" appear in almost identical surroundings: both come after "the" and before "sat". After millions of examples like this, the method concludes that these words play the same role, so their vectors should be close. Nobody labelled either one as an "animal". The signal came entirely from context. It's the same trick as Article #01's self-labelling training data: the text supplies its own lessons.</p>
+
+    <h3>How it learns: skip-gram training</h3>
+
+    <p>Word2Vec's <strong>skip-gram</strong> version trains a <em>shallow</em> neural network (a single hidden layer, the opposite of the many-layered networks in Article #01, §05) on a simple task: given a centre word, predict the words around it. The interesting part is what's left over afterwards. The network's weight matrix has one row per word, and after training, <em>those rows are the embeddings</em>. The prediction task is just a way to make useful rows appear.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 2</span><span>Skip-gram: how embeddings fall out of a prediction task</span></div><div class="body"><svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="f2m" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5C6B66"/></marker></defs><text x="16" y="22" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">1 · SLIDE A WINDOW OVER REAL TEXT (±2 WORDS)</text><rect x="16" y="32" width="48" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="40.0" y="49.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">the</text><rect x="70" y="32" width="48" height="26" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="94.0" y="49.0" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">cat</text><rect x="124" y="32" width="48" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="148.0" y="49.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">sat</text><rect x="178" y="32" width="48" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="202.0" y="49.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">on</text><rect x="232" y="32" width="48" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="256.0" y="49.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">the</text><rect x="286" y="32" width="48" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="310.0" y="49.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">mat</text><text x="350" y="50" font-size="10.5" fill="#33443F">centre word "cat"; its neighbours are the answers</text><text x="16" y="94" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">2 · TURN IT INTO PREDICTION PAIRS</text><rect x="16" y="104" width="48" height="26" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="40.0" y="121.0" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">cat</text><line x1="68" y1="117" x2="80" y2="117" stroke="#5C6B66" stroke-width="1.3" marker-end="url(#f2m)"/><rect x="84" y="104" width="44" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="106.0" y="121.0" text-anchor="middle" font-size="11" font-weight="500" fill="#101C19">the</text><rect x="136" y="104" width="48" height="26" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="160.0" y="121.0" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">cat</text><line x1="188" y1="117" x2="200" y2="117" stroke="#5C6B66" stroke-width="1.3" marker-end="url(#f2m)"/><rect x="204" y="104" width="44" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="226.0" y="121.0" text-anchor="middle" font-size="11" font-weight="500" fill="#101C19">sat</text><rect x="256" y="104" width="48" height="26" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="280.0" y="121.0" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">cat</text><line x1="308" y1="117" x2="320" y2="117" stroke="#5C6B66" stroke-width="1.3" marker-end="url(#f2m)"/><rect x="324" y="104" width="44" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="346.0" y="121.0" text-anchor="middle" font-size="11" font-weight="500" fill="#101C19">on</text><text x="16" y="164" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">3 · A SHALLOW NETWORK LEARNS TO PREDICT THEM</text><rect x="16" y="186" width="110" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="71.0" y="203.0" text-anchor="middle" font-size="11" font-weight="500" fill="#101C19">input: “cat”</text><line x1="130" y1="199" x2="176" y2="199" stroke="#5C6B66" stroke-width="1.4" marker-end="url(#f2m)"/><rect x="180" y="176" width="120" height="46" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.6"/><text x="240" y="196" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8A5E0F">weight matrix W</text><text x="240" y="212" text-anchor="middle" font-size="10" fill="#33443F">one row per word</text><line x1="304" y1="199" x2="350" y2="199" stroke="#5C6B66" stroke-width="1.4" marker-end="url(#f2m)"/><rect x="354" y="186" width="150" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="429.0" y="203.0" text-anchor="middle" font-size="11" font-weight="500" fill="#101C19">guess the neighbours</text><line x1="508" y1="199" x2="548" y2="199" stroke="#5C6B66" stroke-width="1.4" marker-end="url(#f2m)"/><rect x="552" y="186" width="130" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="617.0" y="203.0" text-anchor="middle" font-size="11" font-weight="500" fill="#101C19">compare, adjust W</text><text x="16" y="262" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">4 · AFTER MILLIONS OF SENTENCES, THE ROWS OF W ARE THE EMBEDDINGS</text><text x="70" y="289" text-anchor="end" font-size="11" font-weight="600" fill="#101C19">cat</text><rect x="80" y="274" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="107" y="288" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.62</text><rect x="138" y="274" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="165" y="288" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.18</text><rect x="196" y="274" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="223" y="288" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.44</text><rect x="254" y="274" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="281" y="288" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.09</text><text x="312" y="288" font-size="10" fill="#5C6B66">…</text><text x="70" y="313" text-anchor="end" font-size="11" font-weight="600" fill="#101C19">dog</text><rect x="80" y="298" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="107" y="312" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.59</text><rect x="138" y="298" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="165" y="312" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.21</text><rect x="196" y="298" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="223" y="312" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.40</text><rect x="254" y="298" width="54" height="20" rx="2" fill="#F6EEDC" stroke="#B4C0BC"/><text x="281" y="312" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.12</text><text x="312" y="312" font-size="10" fill="#5C6B66">…</text><text x="70" y="337" text-anchor="end" font-size="11" font-weight="600" fill="#101C19">carrot</text><rect x="80" y="322" width="54" height="20" rx="2" fill="#E9EDEB" stroke="#B4C0BC"/><text x="107" y="336" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.30</text><rect x="138" y="322" width="54" height="20" rx="2" fill="#E9EDEB" stroke="#B4C0BC"/><text x="165" y="336" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.52</text><rect x="196" y="322" width="54" height="20" rx="2" fill="#E9EDEB" stroke="#B4C0BC"/><text x="223" y="336" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.05</text><rect x="254" y="322" width="54" height="20" rx="2" fill="#E9EDEB" stroke="#B4C0BC"/><text x="281" y="336" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.41</text><text x="312" y="336" font-size="10" fill="#5C6B66">…</text><text x="420" y="292" font-size="11" fill="#33443F"><tspan x="420">"cat" and "dog" keep turning up</tspan><tspan x="420" dy="16">next to the same words, so</tspan><tspan x="420" dy="16">their rows end up alike.</tspan><tspan x="420" dy="16" fill="#5C6B66">(numbers are illustrative)</tspan></text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>The network is a means to an end. What we keep is the weight matrix, whose rows become the word vectors.</figcaption></figure>
+
+    <h3>The limitation that leads to the next step</h3>
+
+    <p>Word2Vec gives each word one fixed vector. "bank" gets a single embedding forever, whether it appears in "river bank" or "savings bank". This is the <strong>polysemy problem</strong> (polysemy means one word having several meanings): one vector tries to average all of them. It's the same "bank of the river" puzzle from Article #01, §10, and it's exactly what the Transformer's attention solves.</p>
+  </section>
+
+  <section id="s4">
+    <h2><span class="part">§ 04 · Scaling Up</span>From Word to Sentence Embeddings</h2>
+
+    <p>Word2Vec gives you one vector per word. But RAG pipelines, semantic search, and document retrieval need one vector per <em>sentence, paragraph, or document</em>.</p>
+
+    <h3>The naive approach: average the word vectors</h3>
+
+    <p>Take the vector for every word in a sentence and average them. It works for simple cases, but it has a fatal flaw: word order disappears. "Dog bites man" and "man bites dog" contain the same three words, so they produce the same average. Article #02 showed the same order problem for Transformers, and solved it with position information.</p>
+
+    <h3>The Transformer solution: contextual embeddings</h3>
+
+    <p>A Transformer encoder (Article #02, §06) reads the whole sentence at once, with attention. So the same word gets a <em>different</em> vector depending on its neighbours: "bank" next to "river" comes out differently from "bank" next to "account". To squeeze the sentence into one vector, you <strong>mean-pool</strong>: average all the token vectors number by number, so dozens of token vectors collapse into one sentence vector that blends a bit of everything. Because each token vector already reflects its context, the average keeps far more meaning than Word2Vec averaging did.</p>
+
+    <h3>Sentence-BERT (2019)</h3>
+
+    <p>BERT on its own wasn't very good at sentence-level similarity. In 2019, Nils Reimers and Iryna Gurevych fine-tuned it specifically for that job using a <strong>siamese network</strong>: two identical copies of the same network, sharing the same weights, each reading one sentence of a pair. Think of identical twins who each read a different book and then compare notes on how similar the books felt. Trained on many sentence pairs, the result was a 768-number vector per sentence that captured meaning well across topics. <code>all-MiniLM-L6-v2</code>, the model we use in this article, comes from the same family: a smaller, faster model trained with the same sentence-transformers approach.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 3</span><span>From tokens to one sentence vector</span></div><div class="body"><svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="f3m" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5C6B66"/></marker></defs><text x="16" y="22" font-size="12" font-weight="700" fill="#101C19">Transformer route (what sentence-transformers does)</text><rect x="16" y="36" width="72" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="52.0" y="53.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">I</text><line x1="52" y1="64" x2="52" y2="78" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="100" y="36" width="72" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="136.0" y="53.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">sat</text><line x1="136" y1="64" x2="136" y2="78" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="184" y="36" width="72" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="220.0" y="53.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">by</text><line x1="220" y1="64" x2="220" y2="78" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="268" y="36" width="72" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="304.0" y="53.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">the</text><line x1="304" y1="64" x2="304" y2="78" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="352" y="36" width="72" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="388.0" y="53.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">river</text><line x1="388" y1="64" x2="388" y2="78" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="436" y="36" width="72" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="472.0" y="53.0" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">bank</text><line x1="472" y1="64" x2="472" y2="78" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="16" y="82" width="492" height="36" rx="3" fill="#101C19"/><text x="262" y="105" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">Transformer encoder (attention: every token sees every other)</text><line x1="52" y1="120" x2="52" y2="134" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="22" y="138" width="60" height="46" rx="3" fill="#fff" stroke="#B4C0BC" stroke-width="1.2"/><rect x="30" y="146" width="42" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="30" y="157" width="35" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="30" y="168" width="28" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><line x1="136" y1="120" x2="136" y2="134" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="106" y="138" width="60" height="46" rx="3" fill="#fff" stroke="#B4C0BC" stroke-width="1.2"/><rect x="114" y="146" width="38" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="114" y="157" width="31" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="114" y="168" width="44" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><line x1="220" y1="120" x2="220" y2="134" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="190" y="138" width="60" height="46" rx="3" fill="#fff" stroke="#B4C0BC" stroke-width="1.2"/><rect x="198" y="146" width="40" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="198" y="157" width="33" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="198" y="168" width="26" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><line x1="304" y1="120" x2="304" y2="134" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="274" y="138" width="60" height="46" rx="3" fill="#fff" stroke="#B4C0BC" stroke-width="1.2"/><rect x="282" y="146" width="38" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="282" y="157" width="31" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="282" y="168" width="44" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><line x1="388" y1="120" x2="388" y2="134" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="358" y="138" width="60" height="46" rx="3" fill="#fff" stroke="#B4C0BC" stroke-width="1.2"/><rect x="366" y="146" width="34" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="366" y="157" width="27" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><rect x="366" y="168" width="40" height="6" rx="1" fill="#2A9D8F" fill-opacity="0.7"/><line x1="472" y1="120" x2="472" y2="134" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#f3m)"/><rect x="442" y="138" width="60" height="46" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.8"/><rect x="450" y="146" width="36" height="6" rx="1" fill="#0E6E62" fill-opacity="0.7"/><rect x="450" y="157" width="29" height="6" rx="1" fill="#0E6E62" fill-opacity="0.7"/><rect x="450" y="168" width="42" height="6" rx="1" fill="#0E6E62" fill-opacity="0.7"/><text x="472" y="198" text-anchor="middle" font-size="10" fill="#0E6E62" font-weight="600">"bank" near "river"</text><line x1="262" y1="204" x2="262" y2="222" stroke="#5C6B66" stroke-width="1.3" marker-end="url(#f3m)"/><text x="276" y="218" font-size="10.5" fill="#33443F">mean pooling (average, number by number)</text><rect x="172" y="226" width="180" height="34" rx="3" fill="#0E6E62"/><text x="262" y="248" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">one 384-number vector</text><rect x="524" y="30" width="162" height="230" rx="3" fill="#F8E8E4" stroke="#B23A26"/><text x="605" y="52" text-anchor="middle" font-size="11.5" font-weight="700" fill="#B23A26">Word2Vec averaging</text><text x="605" y="76" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">"dog bites man"</text><text x="605" y="94" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">"man bites dog"</text><text x="605" y="118" text-anchor="middle" font-size="11" fill="#B23A26" font-weight="600">→ identical vectors</text><text x="605" y="148" text-anchor="middle" font-size="10.5" fill="#33443F"><tspan x="605">Same words, same</tspan><tspan x="605" dy="14">average. Order and</tspan><tspan x="605" dy="14">context are lost, and</tspan><tspan x="605" dy="14">"bank" always gets</tspan><tspan x="605" dy="14">the same vector.</tspan></text><text x="16" y="300" font-size="11" fill="#33443F"><tspan x="16">With a transformer, each token's vector already reflects its neighbours before pooling. "bank" next to "river" and "bank" next to</tspan><tspan x="16" dy="16">"account" come out as different vectors, so the pooled sentence vector keeps that difference.</tspan></text><text x="350" y="360" text-anchor="middle" font-size="10.5" fill="#5C6B66">all-MiniLM-L6-v2: 6 transformer layers, 384 numbers per token, mean pooling, then scaled to length 1.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>The encoder produces one context-aware vector per token; mean pooling collapses them into one. Word2Vec averaging, on the right, can't tell word orders apart.</figcaption></figure>
+  </section>
+
+  <section id="s5">
+    <h2><span class="part">§ 05 · Hands-on Code</span>Generating Embeddings with sentence-transformers</h2>
+
+    <p>Install the library and open a Jupyter notebook. We'll build semantic search from the ground up, with no database and no index, just vectors and cosine similarity.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Bash</span><span>setup</span></div><pre><span class="pmt">$</span> pip install sentence-transformers scikit-learn</pre></div>
+
+    <h3>Encoding, and what comes out</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 1 · basic encoding</span></div><pre><span class="kw">from</span> sentence_transformers <span class="kw">import</span> SentenceTransformer
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="cm"># Small, fast, and good. Downloads about 90 MB the first time, then it's cached.</span>
+model = <span class="fn">SentenceTransformer</span>(<span class="st">"all-MiniLM-L6-v2"</span>)
+
+sentences = [
+    <span class="st">"Machine learning is a subset of artificial intelligence"</span>,
+    <span class="st">"Deep learning uses neural networks with many layers"</span>,
+    <span class="st">"I love eating pizza on Friday nights"</span>,
+    <span class="st">"The best pasta recipe uses fresh tomatoes"</span>,
+]
+
+embeddings = model.<span class="fn">encode</span>(sentences)
+<span class="fn">print</span>(embeddings.shape)
+<span class="out"># (4, 384)   4 sentences, 384 numbers each</span>
+
+<span class="fn">print</span>(embeddings[<span class="nm">0</span>][:<span class="nm">6</span>].<span class="fn">round</span>(<span class="nm">3</span>))
+<span class="out"># [-0.046 -0.004  0.07   0.036  0.049 -0.03 ]</span>
+
+<span class="fn">print</span>(np.linalg.<span class="fn">norm</span>(embeddings[<span class="nm">0</span>]).<span class="fn">round</span>(<span class="nm">3</span>))
+<span class="out"># 1.0   this model already scales every vector to length 1</span></pre></div>
+
+    <h3>Measuring similarity: cosine similarity</h3>
+
+    <p><strong>Cosine similarity</strong> measures the angle between two vectors and ignores how long they are; only <em>direction</em> matters. It's built on the dot product you met in Article #02, §04. Two vectors pointing the same way score <strong>1.0</strong>. Two at a right angle score <strong>0</strong>. Two pointing in opposite directions score <strong>−1.0</strong>.</p>
+
+    <p>Picture two people in a room, each pointing at something. Cosine similarity only asks "are they pointing the same way?" It doesn't care if one has a longer arm. That's why it's the standard way to compare embeddings: two sentences can produce vectors of different lengths for incidental reasons, but if they mean the same thing, they point the same way.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 4</span><span>Cosine similarity: direction, not length</span></div><div class="body"><svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="f4a" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0E6E62"/></marker><marker id="f4b" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#8A5E0F"/></marker><marker id="f4c" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#B23A26"/></marker></defs><text x="100" y="30" text-anchor="middle" font-size="12.5" font-weight="700" fill="#101C19">Same direction</text><circle cx="80" cy="150" r="3" fill="#101C19"/><circle cx="80" cy="150" r="70" fill="none" stroke="#D2DAD7" stroke-dasharray="3 3"/><line x1="80" y1="150" x2="143.4" y2="120.4" stroke="#0E6E62" stroke-width="2.4" marker-end="url(#f4a)"/><line x1="80" y1="150" x2="125.3" y2="128.9" stroke="#8A5E0F" stroke-width="2.4" marker-end="url(#f4b)"/><text x="100" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#0E6E62" style="font-family:'IBM Plex Mono',monospace">cos = 1.0</text><text x="100" y="268" text-anchor="middle" font-size="10.5" fill="#5C6B66">same meaning</text><text x="270" y="30" text-anchor="middle" font-size="12.5" font-weight="700" fill="#101C19">Right angle</text><circle cx="250" cy="150" r="3" fill="#101C19"/><circle cx="250" cy="150" r="70" fill="none" stroke="#D2DAD7" stroke-dasharray="3 3"/><line x1="250" y1="150" x2="315.8" y2="126.1" stroke="#0E6E62" stroke-width="2.4" marker-end="url(#f4a)"/><line x1="250" y1="150" x2="226.1" y2="84.2" stroke="#8A5E0F" stroke-width="2.4" marker-end="url(#f4b)"/><text x="270" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">cos = 0</text><text x="270" y="268" text-anchor="middle" font-size="10.5" fill="#5C6B66">unrelated</text><text x="440" y="30" text-anchor="middle" font-size="12.5" font-weight="700" fill="#101C19">Opposite</text><circle cx="420" cy="150" r="3" fill="#101C19"/><circle cx="420" cy="150" r="70" fill="none" stroke="#D2DAD7" stroke-dasharray="3 3"/><line x1="420" y1="150" x2="485.8" y2="126.1" stroke="#0E6E62" stroke-width="2.4" marker-end="url(#f4a)"/><line x1="420" y1="150" x2="354.2" y2="173.9" stroke="#8A5E0F" stroke-width="2.4" marker-end="url(#f4b)"/><text x="440" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#B23A26" style="font-family:'IBM Plex Mono',monospace">cos = −1.0</text><text x="440" y="268" text-anchor="middle" font-size="10.5" fill="#5C6B66">opposite</text><text x="100" y="296" text-anchor="middle" font-size="10" fill="#33443F"><tspan x="100">different lengths,</tspan><tspan x="100" dy="13">same direction: still ≈1</tspan></text><rect x="530" y="40" width="156" height="236" rx="3" fill="#fff" stroke="#D2DAD7"/><text x="608" y="60" text-anchor="middle" font-size="11" font-weight="700" fill="#101C19">Real scores</text><text x="608" y="74" text-anchor="middle" font-size="9.5" fill="#5C6B66">all-MiniLM-L6-v2</text><text x="542" y="94" font-size="9.5" fill="#101C19">dog chased cat ↔</text><text x="542" y="106" font-size="9.5" fill="#101C19">puppy ran after kitten</text><rect x="542" y="112" width="93" height="8" rx="2" fill="#0E6E62"/><text x="641" y="120" font-size="10" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.547</text><text x="542" y="140" font-size="9.5" fill="#101C19">ML is part of AI ↔</text><text x="542" y="152" font-size="9.5" fill="#101C19">deep learning, networks</text><rect x="542" y="158" width="71" height="8" rx="2" fill="#0E6E62"/><text x="619" y="166" font-size="10" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.415</text><text x="542" y="186" font-size="9.5" fill="#101C19">pizza on Fridays ↔</text><text x="542" y="198" font-size="9.5" fill="#101C19">best pasta recipe</text><rect x="542" y="204" width="46" height="8" rx="2" fill="#0E6E62"/><text x="594" y="212" font-size="10" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.273</text><text x="542" y="232" font-size="9.5" fill="#101C19">dog chased cat ↔</text><text x="542" y="244" font-size="9.5" fill="#101C19">stock market crashed</text><rect x="542" y="250" width="8" height="8" rx="2" fill="#B4C0BC"/><text x="556" y="258" font-size="10" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.048</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Left: the geometry. Right: real scores from all-MiniLM-L6-v2 for pairs used in this article.</figcaption></figure>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 2 · similarity between every pair</span></div><pre><span class="kw">from</span> sklearn.metrics.pairwise <span class="kw">import</span> cosine_similarity
+
+sim = <span class="fn">cosine_similarity</span>(embeddings)
+
+<span class="kw">for</span> i, s1 <span class="kw">in</span> <span class="fn">enumerate</span>(sentences):
+    <span class="kw">for</span> j, s2 <span class="kw">in</span> <span class="fn">enumerate</span>(sentences):
+        <span class="kw">if</span> i &lt; j:
+            <span class="fn">print</span>(<span class="st">f"{sim[i][j]:.3f} | {s1[:38]:&lt;38} ↔ {s2[:38]}"</span>)
+
+<span class="out"># 0.415 | Machine learning is a subset of artifi ↔ Deep learning uses neural networks wit
+# 0.016 | Machine learning is a subset of artifi ↔ I love eating pizza on Friday nights
+# 0.033 | Machine learning is a subset of artifi ↔ The best pasta recipe uses fresh tomat
+# 0.021 | Deep learning uses neural networks wit ↔ I love eating pizza on Friday nights
+# 0.121 | Deep learning uses neural networks wit ↔ The best pasta recipe uses fresh tomat
+# 0.273 | I love eating pizza on Friday nights   ↔ The best pasta recipe uses fresh tomat</span></pre></div>
+
+    <p>The two AI sentences score 0.415, the two food sentences 0.273, and every tech-versus-food pair lands between 0.016 and 0.121. The within-topic pairs clearly win, even though none of those scores is anywhere near 1.0. That's normal: with this model, closely related sentences often score between 0.3 and 0.7, and unrelated ones near zero. Compare scores with each other, not against a fixed idea of what "similar" should look like.</p>
+
+    <h3>Semantic search from scratch</h3>
+
+    <p>This is where it all comes together: a working semantic search engine in a dozen lines. The same pattern is the retrieval half of every RAG system.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 3 · semantic search (minimal RAG retrieval)</span></div><pre>query = <span class="st">"how do neural networks learn?"</span>
+query_emb = model.<span class="fn">encode</span>([query])
+
+documents = [
+    <span class="st">"Backpropagation is the algorithm that trains neural networks"</span>,
+    <span class="st">"Paris is the capital of France"</span>,
+    <span class="st">"Gradient descent minimises the loss function during training"</span>,
+    <span class="st">"The Eiffel Tower was built in 1889"</span>,
+    <span class="st">"Weights in a neural network are updated using gradients"</span>,
+    <span class="st">"Sourdough bread requires a live starter culture"</span>,
+]
+
+doc_embs = model.<span class="fn">encode</span>(documents)
+scores = <span class="fn">cosine_similarity</span>(query_emb, doc_embs)[<span class="nm">0</span>]
+
+<span class="kw">for</span> score, doc <span class="kw">in</span> <span class="fn">sorted</span>(<span class="fn">zip</span>(scores, documents), reverse=<span class="kw">True</span>):
+    <span class="fn">print</span>(<span class="st">f"{score:.3f}  {doc}"</span>)
+
+<span class="out"># 0.672  Backpropagation is the algorithm that trains neural networks
+# 0.463  Weights in a neural network are updated using gradients
+# 0.377  Gradient descent minimises the loss function during training
+# 0.088  Paris is the capital of France
+# 0.032  Sourdough bread requires a live starter culture
+# 0.006  The Eiffel Tower was built in 1889</span></pre></div>
+
+    <p>The top three results are all about how networks train, which is exactly right. And look at the gap: the third-best relevant document (0.377) scores more than four times higher than the best irrelevant one (0.088). The word "learn" doesn't appear in any of them. The ranking comes from meaning, through geometry.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 5</span><span>Same documents, two different queries</span></div><div class="body"><svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><text x="16" y="22" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">QUERY</text><text x="62" y="22" font-size="12" font-weight="700" font-style="italic" fill="#101C19">"how do neural networks learn?"</text><text x="16" y="52" font-size="10.5" fill="#101C19" font-weight="600">1. Backpropagation … trains neural networks</text><rect x="16" y="58" width="255" height="10" rx="2" fill="#0E6E62"/><text x="277" y="67" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.672</text><text x="16" y="92" font-size="10.5" fill="#101C19" font-weight="600">2. Weights … updated using gradients</text><rect x="16" y="98" width="176" height="10" rx="2" fill="#0E6E62"/><text x="198" y="107" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.463</text><text x="16" y="132" font-size="10.5" fill="#101C19" font-weight="600">3. Gradient descent minimises the loss …</text><rect x="16" y="138" width="143" height="10" rx="2" fill="#0E6E62"/><text x="165" y="147" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.377</text><text x="16" y="172" font-size="10.5" fill="#5C6B66" font-weight="400">4. Paris is the capital of France</text><rect x="16" y="178" width="33" height="10" rx="2" fill="#B4C0BC"/><text x="55" y="187" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.088</text><text x="16" y="212" font-size="10.5" fill="#5C6B66" font-weight="400">5. Sourdough bread requires … starter</text><rect x="16" y="218" width="12" height="10" rx="2" fill="#B4C0BC"/><text x="34" y="227" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.032</text><text x="16" y="252" font-size="10.5" fill="#5C6B66" font-weight="400">6. The Eiffel Tower was built in 1889</text><rect x="16" y="258" width="2" height="10" rx="2" fill="#B4C0BC"/><text x="24" y="267" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.006</text><text x="360" y="22" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">QUERY</text><text x="406" y="22" font-size="12" font-weight="700" font-style="italic" fill="#101C19">"how do I make sourdough?"</text><text x="360" y="52" font-size="10.5" fill="#101C19" font-weight="600">1. Sourdough bread requires … starter</text><rect x="360" y="58" width="201" height="10" rx="2" fill="#0E6E62"/><text x="567" y="67" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.530</text><text x="360" y="92" font-size="10.5" fill="#5C6B66" font-weight="400">2. Backpropagation … trains neural networks</text><rect x="360" y="98" width="59" height="10" rx="2" fill="#B4C0BC"/><text x="425" y="107" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.155</text><text x="360" y="132" font-size="10.5" fill="#5C6B66" font-weight="400">3. Paris is the capital of France</text><rect x="360" y="138" width="14" height="10" rx="2" fill="#B4C0BC"/><text x="380" y="147" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.037</text><text x="360" y="172" font-size="10.5" fill="#5C6B66" font-weight="400">4. Gradient descent minimises the loss …</text><rect x="360" y="178" width="3" height="10" rx="2" fill="#B4C0BC"/><text x="369" y="187" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.009</text><text x="360" y="212" font-size="10.5" fill="#5C6B66" font-weight="400">5. The Eiffel Tower was built in 1889</text><rect x="360" y="218" width="2" height="10" rx="2" fill="#B4C0BC"/><text x="368" y="227" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.001</text><text x="360" y="252" font-size="10.5" fill="#5C6B66" font-weight="400">6. Weights … updated using gradients</text><rect x="360" y="258" width="2" height="10" rx="2" fill="#B4C0BC"/><text x="368" y="267" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.002</text><line x1="350" y1="10" x2="350" y2="280" stroke="#D2DAD7" stroke-dasharray="4 4"/><text x="350" y="292" text-anchor="middle" font-size="10.5" fill="#5C6B66">Real cosine scores from all-MiniLM-L6-v2. No query word appears in the top result on the left.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Change the query to "how do I make sourdough?" and the ranking flips: the bread document jumps to the top and the machine-learning documents fall away.</figcaption></figure>
+
+    <div class="aside">
+      <span class="label">This is RAG retrieval</span>
+      <p>What you just built is the retrieval half of a RAG system. In Phase 5 we swap the in-memory array for a vector database, scale to millions of documents, and hand the top results to an LLM as context. But the core mechanic is exactly this: embed the query, embed the documents, rank by cosine similarity, take the top matches.</p>
+    </div>
+
+    <h3>Batch encoding for large datasets</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 4 · scale up</span></div><pre>large_corpus = [<span class="st">f"Document number {i}"</span> <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">10_000</span>)]
+
+embeddings = model.<span class="fn">encode</span>(
+    large_corpus,
+    batch_size=<span class="nm">64</span>,              <span class="cm"># encode 64 texts at a time</span>
+    show_progress_bar=<span class="kw">True</span>,
+    normalize_embeddings=<span class="kw">True</span>,  <span class="cm"># length-1 vectors: cosine similarity = plain dot product</span>
+)
+<span class="fn">print</span>(embeddings.shape)
+<span class="out"># (10000, 384)</span></pre></div>
+
+    <p><code>normalize_embeddings=True</code> rescales every vector to length 1 before you store it. Once every vector has length 1, the cosine formula (which normally divides by both lengths) reduces to a plain dot product, the cheapest comparison there is. This particular model already does that for you, as experiment 1 showed, but many models don't, so it's a good habit. It's the same optimisation the vector databases in Phase 3 rely on.</p>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Run the semantic search live. Then change the query to "how do I make sourdough?" and show the ranking flip, as in Figure 5. Say: "No keywords, no rules, no SQL. Just geometry."
+    </div>
+  </section>
+
+  <section id="s6">
+    <h2><span class="part">§ 06 · Production Option</span>Generating Embeddings with the OpenAI API</h2>
+
+    <p>When you move from prototype to production, or when retrieval quality really matters, you may switch to a hosted embedding API. OpenAI's is a common choice, and the interface is simple.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Bash</span><span>setup</span></div><pre><span class="pmt">$</span> pip install openai</pre></div>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>OpenAI embeddings API</span></div><pre><span class="kw">from</span> openai <span class="kw">import</span> OpenAI
+
+client = <span class="fn">OpenAI</span>()  <span class="cm"># reads OPENAI_API_KEY from your environment</span>
+
+response = client.embeddings.<span class="fn">create</span>(
+    model=<span class="st">"text-embedding-3-small"</span>,
+    input=[
+        <span class="st">"What is retrieval augmented generation?"</span>,
+        <span class="st">"How does RAG work in LangChain?"</span>,
+    ],
+)
+
+vectors = [item.embedding <span class="kw">for</span> item <span class="kw">in</span> response.data]
+<span class="fn">print</span>(<span class="fn">len</span>(vectors[<span class="nm">0</span>]))                <span class="out"># 1536</span>
+<span class="fn">print</span>(response.usage.total_tokens)      <span class="out"># 15   (billed by the token, as in Article #03)</span></pre></div>
+
+    <div class="aside">
+      <span class="label">A useful, easy-to-miss feature</span>
+      <p>OpenAI's <code>text-embedding-3</code> models were trained with a technique called Matryoshka Representation Learning, named after Russian nesting dolls, that lets you shorten the vector and keep most of its usefulness. Pass <code>dimensions=256</code> to <code>client.embeddings.create()</code> and you get 256 numbers instead of 1,536, at a fraction of the storage and search cost, with only a modest drop in quality. That matters when §08's "more dimensions cost more" trade-off hits your storage budget.</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th><code>all-MiniLM-L6-v2</code></th><th><code>text-embedding-3-small</code></th></tr></thead>
+        <tbody>
+          <tr><td class="k">Dimensions</td><td>384</td><td>1,536 (or fewer, via <code>dimensions</code>)</td></tr>
+          <tr><td class="k">Cost</td><td>Free, runs locally</td><td>About $0.02 per million tokens (check current pricing)</td></tr>
+          <tr><td class="k">Speed</td><td>Fast on a CPU, faster on a GPU</td><td>Network round trip on every call</td></tr>
+          <tr><td class="k">Privacy</td><td>Text never leaves your machine</td><td>Text is sent to OpenAI</td></tr>
+          <tr><td class="k">Quality</td><td>Good for most prototypes</td><td>Stronger retrieval, longer inputs (up to 8,191 tokens)</td></tr>
+          <tr><td class="k">Best for</td><td>Learning, prototyping, private data</td><td>Production systems where quality matters most</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="aside">
+      <span class="label">Practical guidance</span>
+      <p>Develop locally with <code>sentence-transformers</code>: fast iteration, no cost, and your data stays private. Consider a hosted model like <code>text-embedding-3-small</code> when you need the extra retrieval quality in production. For sensitive content (healthcare, legal, internal documents), prefer a model you host yourself, even if a hosted one scores a little higher.</p>
+    </div>
+  </section>
+
+  <section id="s7">
+    <h2><span class="part">§ 07 · Making It Visible</span>Visualising Embedding Space</h2>
+
+    <p>384-dimensional vectors are invisible. <strong>PCA</strong> (Principal Component Analysis) finds the few directions along which the data varies most and projects everything onto them, so 384 dimensions can be flattened to the 2 you can plot. Some structure is lost, but a surprising amount survives.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Bash</span><span>setup</span></div><pre><span class="pmt">$</span> pip install matplotlib scikit-learn</pre></div>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>PCA cluster plot</span></div><pre><span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+<span class="kw">from</span> sklearn.decomposition <span class="kw">import</span> PCA
+<span class="kw">from</span> sentence_transformers <span class="kw">import</span> SentenceTransformer
+
+model = <span class="fn">SentenceTransformer</span>(<span class="st">"all-MiniLM-L6-v2"</span>)
+
+sentences = [
+    <span class="st">"Machine learning models learn from data"</span>,          <span class="cm"># Tech</span>
+    <span class="st">"Neural networks are inspired by the human brain"</span>,  <span class="cm"># Tech</span>
+    <span class="st">"Python is the most popular language for AI"</span>,       <span class="cm"># Tech</span>
+    <span class="st">"Pizza is a beloved Italian dish"</span>,                  <span class="cm"># Food</span>
+    <span class="st">"Pasta with tomato sauce is a classic meal"</span>,        <span class="cm"># Food</span>
+    <span class="st">"Risotto requires constant stirring"</span>,               <span class="cm"># Food</span>
+    <span class="st">"Football is the most popular sport globally"</span>,      <span class="cm"># Sport</span>
+    <span class="st">"A cricket match can last five days"</span>,               <span class="cm"># Sport</span>
+    <span class="st">"Swimming is an excellent full-body workout"</span>,       <span class="cm"># Sport</span>
+]
+colors = [<span class="st">"#0E6E62"</span>] * <span class="nm">3</span> + [<span class="st">"#8A5E0F"</span>] * <span class="nm">3</span> + [<span class="st">"#B23A26"</span>] * <span class="nm">3</span>   <span class="cm"># tech, food, sport</span>
+
+embeddings = model.<span class="fn">encode</span>(sentences)
+reduced = <span class="fn">PCA</span>(n_components=<span class="nm">2</span>).<span class="fn">fit_transform</span>(embeddings)
+
+plt.<span class="fn">figure</span>(figsize=(<span class="nm">9</span>, <span class="nm">6</span>))
+<span class="kw">for</span> i, (x, y) <span class="kw">in</span> <span class="fn">enumerate</span>(reduced):
+    plt.<span class="fn">scatter</span>(x, y, color=colors[i], s=<span class="nm">130</span>, edgecolors=<span class="st">"white"</span>, linewidths=<span class="nm">1.5</span>)
+    plt.<span class="fn">annotate</span>(sentences[i][:<span class="nm">28</span>], (x, y), fontsize=<span class="nm">8</span>, ha=<span class="st">"center"</span>,
+                 xytext=(<span class="nm">0</span>, <span class="nm">7</span>), textcoords=<span class="st">"offset points"</span>)
+plt.<span class="fn">axis</span>(<span class="st">"off"</span>)
+plt.<span class="fn">tight_layout</span>()
+plt.<span class="fn">savefig</span>(<span class="st">"embedding_clusters.png"</span>, dpi=<span class="nm">150</span>, bbox_inches=<span class="st">"tight"</span>)
+plt.<span class="fn">show</span>()</pre></div>
+
+    <figure class="exhibit"><div class="head"><span>Figure 6</span><span>What you'll see: three topic clusters</span></div><div class="body"><svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><rect x="20" y="20" width="660" height="330" rx="3" fill="#FCFDFC" stroke="#D2DAD7"/><circle cx="167.5" cy="304.7" r="7" fill="#0E6E62" stroke="#fff" stroke-width="1.5"/><text x="167.5" y="292.7" text-anchor="middle" font-size="10" fill="#101C19">Machine learning models lear…</text><circle cx="144.2" cy="304.9" r="7" fill="#0E6E62" stroke="#fff" stroke-width="1.5"/><text x="144.2" y="322.9" text-anchor="middle" font-size="10" fill="#101C19">Neural networks are inspired…</text><circle cx="251.4" cy="237.3" r="7" fill="#0E6E62" stroke="#fff" stroke-width="1.5"/><text x="251.4" y="225.3" text-anchor="middle" font-size="10" fill="#101C19">Python is the most popular l…</text><circle cx="539.4" cy="288.1" r="7" fill="#8A5E0F" stroke="#fff" stroke-width="1.5"/><line x1="539.4" y1="288.1" x2="499.4" y2="240.1" stroke="#B4C0BC" stroke-width="1"/><text x="495.4" y="244.1" text-anchor="end" font-size="10" fill="#101C19">Pizza is a beloved Italian d…</text><circle cx="535.0" cy="285.1" r="7" fill="#8A5E0F" stroke="#fff" stroke-width="1.5"/><line x1="535.0" y1="285.1" x2="495.0" y2="255.1" stroke="#B4C0BC" stroke-width="1"/><text x="491.0" y="259.1" text-anchor="end" font-size="10" fill="#101C19">Pasta with tomato sauce is a…</text><circle cx="548.0" cy="276.1" r="7" fill="#8A5E0F" stroke="#fff" stroke-width="1.5"/><line x1="548.0" y1="276.1" x2="508.0" y2="306.1" stroke="#B4C0BC" stroke-width="1"/><text x="504.0" y="310.1" text-anchor="end" font-size="10" fill="#101C19">Risotto requires constant st…</text><circle cx="328.8" cy="101.8" r="7" fill="#B23A26" stroke="#fff" stroke-width="1.5"/><text x="328.8" y="89.8" text-anchor="middle" font-size="10" fill="#101C19">Football is the most popular…</text><circle cx="378.3" cy="67.9" r="7" fill="#B23A26" stroke="#fff" stroke-width="1.5"/><text x="378.3" y="55.9" text-anchor="middle" font-size="10" fill="#101C19">A cricket match can last fiv…</text><circle cx="338.2" cy="155.8" r="7" fill="#B23A26" stroke="#fff" stroke-width="1.5"/><text x="338.2" y="173.8" text-anchor="middle" font-size="10" fill="#101C19">Swimming is an excellent ful…</text><circle cx="40" cy="40" r="6" fill="#0E6E62"/><text x="50" y="44" font-size="11.5" font-weight="600" fill="#101C19">Tech</text><circle cx="120" cy="40" r="6" fill="#8A5E0F"/><text x="130" y="44" font-size="11.5" font-weight="600" fill="#101C19">Food</text><circle cx="200" cy="40" r="6" fill="#B23A26"/><text x="210" y="44" font-size="11.5" font-weight="600" fill="#101C19">Sport</text><text x="350" y="370" text-anchor="middle" font-size="10.5" fill="#5C6B66">Real PCA output for the nine sentences in §07. Average similarity within a topic: 0.27; across topics: 0.06.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Real output. Nobody told the model which sentences were about tech, food, or sport, yet they fall into three groups. The food sentences sit almost on top of each other.</figcaption></figure>
+
+    <p>This is what §02 promised: three clean clusters, without any topic labels. For bigger or messier datasets, try <strong>t-SNE</strong> (t-distributed Stochastic Neighbor Embedding). It's slower and its axes mean nothing on their own, but it's often better at pulling separate groups visibly apart. One catch: its <code>perplexity</code> setting must be smaller than the number of points, so for our nine sentences it has to be tiny.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>swap PCA for t-SNE</span></div><pre><span class="kw">from</span> sklearn.manifold <span class="kw">import</span> TSNE
+
+<span class="cm"># perplexity must be less than the number of points. Use ~3 for 9 sentences;</span>
+<span class="cm"># values between 5 and 50 are typical once you have hundreds of points.</span>
+reduced = <span class="fn">TSNE</span>(n_components=<span class="nm">2</span>, perplexity=<span class="nm">3</span>, random_state=<span class="nm">42</span>).<span class="fn">fit_transform</span>(embeddings)</pre></div>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Generate the PCA plot live. Say: "Every dot is a sentence. Nearby dots mean similar things. The model worked out that pizza, pasta, and risotto belong together purely from reading text."
+    </div>
+  </section>
+
+  <section id="s8">
+    <h2><span class="part">§ 08 · Engineering Decisions</span>Choosing the Right Embedding Model</h2>
+
+    <p>Your choice of embedding model directly affects retrieval quality, speed, cost, and storage. Here's what to weigh:</p>
+    <ul>
+      <li><strong>Dimensions.</strong> More numbers can capture more nuance but cost more to store and search: 384, 768, 1,024, 1,536, 3,072.</li>
+      <li><strong>Maximum input length.</strong> <code>all-MiniLM-L6-v2</code> reads at most 256 tokens; <code>all-mpnet-base-v2</code> reads 384. Anything longer is <em>silently cut off</em> by default, which is one reason RAG systems split documents into chunks (Phase 5).</li>
+      <li><strong>Languages.</strong> English-only models produce poor vectors for Hindi, Tamil, or Chinese. Article #03 showed how much older tokenisers struggle with Indian scripts, and embedding models inherit their tokeniser's strengths and weaknesses. Use a multilingual model for non-English text, and test it on your own users' languages.</li>
+      <li><strong>Task type.</strong> <em>Retrieval</em> compares a short query with a long document (asymmetric). <em>Similarity</em> compares two texts of a similar kind (symmetric). A model trained for one can do noticeably worse at the other, because the shapes it learned to compare don't match what you give it. The open-source BGE family (from the Beijing Academy of Artificial Intelligence) is strong at retrieval; classic SBERT models are strong at similarity.</li>
+      <li><strong>Benchmarks.</strong> The MTEB leaderboard (<code>huggingface.co/spaces/mteb/leaderboard</code>) ranks embedding models across many tasks and languages. The original MTEB benchmark covered 56 datasets, and it has grown a lot since. Check it before picking a production model, then test the top few on <em>your</em> data, because leaderboard rank doesn't always carry over.</li>
+    </ul>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Model</th><th>Dims</th><th>Max tokens</th><th>Cost</th><th>Good for</th></tr></thead>
+        <tbody>
+          <tr><td class="k"><code>all-MiniLM-L6-v2</code></td><td>384</td><td>256</td><td>Free</td><td>Learning, prototyping, offline</td></tr>
+          <tr><td class="k"><code>all-mpnet-base-v2</code></td><td>768</td><td>384</td><td>Free</td><td>Better English quality, longer inputs</td></tr>
+          <tr><td class="k"><code>BAAI/bge-large-en-v1.5</code></td><td>1,024</td><td>512</td><td>Free</td><td>Open-source retrieval in production</td></tr>
+          <tr><td class="k"><code>paraphrase-multilingual-mpnet-base-v2</code></td><td>768</td><td>128</td><td>Free</td><td>50+ languages</td></tr>
+          <tr><td class="k"><code>text-embedding-3-small</code></td><td>1,536</td><td>8,191</td><td>~$0.02 / 1M tokens</td><td>Hosted production retrieval</td></tr>
+          <tr><td class="k"><code>text-embedding-3-large</code></td><td>3,072</td><td>8,191</td><td>~$0.13 / 1M tokens</td><td>Quality-critical and multilingual work</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="aside">
+      <span class="label">Decision guide</span>
+      <p><strong>Learning or prototyping:</strong> <code>all-MiniLM-L6-v2</code>. Fast, free, no network calls.<br>
+      <strong>Production retrieval:</strong> <code>BAAI/bge-large-en-v1.5</code> (open source) or <code>text-embedding-3-small</code> (hosted).<br>
+      <strong>Multilingual, including Indian languages:</strong> a multilingual model, tested on your own text.<br>
+      <strong>Sensitive data:</strong> a model you host yourself.</p>
+    </div>
+  </section>
+
+  <section id="s9">
+    <h2><span class="part">§ 09 · Summary</span>What You Now Understand</h2>
+    <div class="pathbox summary">
+      <h4>Eight things to take with you</h4>
+      <ul>
+        <li><strong>An embedding is a dense vector that encodes meaning.</strong> Similar meanings land at nearby points, so distance becomes semantic distance.</li>
+        <li><strong>Directions carry relationships.</strong> king − man + woman lands on queen, and Delhi − India + Japan lands on Tokyo, in real word vectors.</li>
+        <li><strong>Word2Vec learned embeddings from context</strong> (the distributional hypothesis). Transformers extended this to context-aware vectors that tell the two meanings of "bank" apart.</li>
+        <li><strong>Sentence-BERT</strong> trained Transformers to produce good sentence vectors; <code>all-MiniLM-L6-v2</code> is a small, free model from the same family.</li>
+        <li><strong>Cosine similarity</strong> measures the angle between vectors, from −1 to +1. Scores are model-specific: rank them against each other rather than reading them as absolute truth.</li>
+        <li><strong>Semantic search is embed the query, embed the documents, rank by cosine similarity.</strong> You built it from scratch, and it's the retrieval half of RAG.</li>
+        <li><strong>Develop with a local model, consider a hosted one for production,</strong> and check the MTEB leaderboard and your own data before committing.</li>
+        <li><strong>PCA and t-SNE make embedding space visible,</strong> and the clusters they reveal show the geometry of meaning is real.</li>
+      </ul>
+    </div>
+
+    <div class="pathbox" id="exercise">
+      <h4>📝 Learner exercise</h4>
+      <ol>
+        <li><strong>Build your own search engine.</strong> Pick a corpus you care about: movie plot summaries, news headlines, Stack Overflow questions, or the docs of a library you use. Embed all of it, then write a loop that takes any query and returns the five most similar documents. No vector database yet, just NumPy and cosine similarity. This is the architecture you'll upgrade in Phase 3.</li>
+        <li><strong>Find the model's blind spot.</strong> Write two sentences that mean opposite things but share most of their words (for example, "the movie was good" and "the movie was not good"). How high is their similarity? What does that tell you about using embeddings for sentiment?</li>
+        <li><strong>Try your language.</strong> Embed an English sentence and its Hindi or Tamil translation with <code>all-MiniLM-L6-v2</code>, then with <code>paraphrase-multilingual-mpnet-base-v2</code>. Which model thinks they mean the same thing?</li>
+      </ol>
+    </div>
+
+    <div class="decision" id="next">
+      <span class="id">Next in the series → Article #05</span>
+      <h5>Attention Mechanism Deep Dive</h5>
+      <p>The next two articles complete Phase 1. Article #05 goes back inside the attention mechanism from Article #02, the machinery that makes context-aware embeddings like the ones in §04 possible: how queries and keys really interact, what researchers find inside real attention heads, how models keep track of word order, and why long contexts are expensive. Then Article #06 turns all of this into practical skill with prompt engineering.</p>
+    </div>
+  </section>
+
+<footer>
+  <p><em>What corpus did you run your search engine on, and what surprised you? Share it in the comments. The most interesting experiments always come from real data that means something to the person running them.</em></p>
+  <p>Generative AI Engineer Series · Article #04 · Phase 1: Foundations</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var rail = document.getElementById('rail');
+  var btn = document.getElementById('railToggle');
+  if (btn && rail) {
+    btn.addEventListener('click', function(){
+      var open = rail.getAttribute('data-open') === 'true';
+      rail.setAttribute('data-open', open ? 'false' : 'true');
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      btn.textContent = open ? 'Show contents' : 'Hide contents';
+    });
+    rail.addEventListener('click', function(e){
+      if (e.target.closest('a') && window.innerWidth < 1080) {
+        rail.setAttribute('data-open', 'false');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.textContent = 'Show contents';
+      }
+    });
+  }
+  // theme switcher: auto -> light -> dark
+  var tb = document.getElementById('themeBtn');
+  var modes = ['auto', 'light', 'dark'], i = 0;
+  if (tb) tb.addEventListener('click', function(){
+    i = (i + 1) % 3;
+    if (modes[i] === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', modes[i]);
+    tb.textContent = 'Theme: ' + modes[i];
+  });
+  // highlight the current section in the rail
+  var links = {};
+  document.querySelectorAll('.rail a[href^="#s"]').forEach(function(a){ links[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting && links[en.target.id]) {
+          Object.values(links).forEach(function(a){ a.classList.remove('on'); });
+          links[en.target.id].classList.add('on');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('main section[id]').forEach(function(s){ io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>

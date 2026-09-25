@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Transformer Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F3F5F4;
+  --surface:#FFFFFF;
+  --surface-sunk:#E9EDEB;
+  --ink:#101C19;
+  --ink-soft:#33443F;
+  --muted:#5C6B66;
+  --rule:#D2DAD7;
+  --rule-strong:#B4C0BC;
+  --accent:#0E6E62;
+  --accent-bright:#2A9D8F;
+  --accent-wash:#E2EFEC;
+  --gain:#1B6B4C;
+  --gain-wash:#E3EFE8;
+  --loss:#B23A26;
+  --amber:#8A5E0F;
+  --amber-wash:#F6EEDC;
+  --loss-wash:#F8E8E4;
+  --c-kw:#0E6E62; --c-fn:#1F5B7A; --c-st:#8A5E0F; --c-cm:#7A8984; --c-nm:#B23A26; --c-out:#1B6B4C;
+
+  --display:"Newsreader",Georgia,"Times New Roman",serif;
+  --body:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --measure:91ch;
+  --wide:1080px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1412; --surface:#141D1A; --surface-sunk:#101816;
+    --ink:#E2E9E6; --ink-soft:#BAC7C2; --muted:#8A9B95;
+    --rule:#243330; --rule-strong:#354844;
+    --accent:#5AC9B6; --accent-bright:#6FD8C4; --accent-wash:#132824;
+    --gain:#54B98C; --gain-wash:#10231B; --loss:#E38270; --amber:#D9A94E; --amber-wash:#251E10; --loss-wash:#261715;
+    --c-kw:#5AC9B6; --c-fn:#7FB8D8; --c-st:#D9A94E; --c-cm:#7A8C86; --c-nm:#E38270; --c-out:#54B98C;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1412; --surface:#141D1A; --surface-sunk:#101816;
+  --ink:#E2E9E6; --ink-soft:#BAC7C2; --muted:#8A9B95;
+  --rule:#243330; --rule-strong:#354844;
+  --accent:#5AC9B6; --accent-bright:#6FD8C4; --accent-wash:#132824;
+  --gain:#54B98C; --gain-wash:#10231B; --loss:#E38270; --amber:#D9A94E; --amber-wash:#251E10; --loss-wash:#261715;
+  --c-kw:#5AC9B6; --c-fn:#7FB8D8; --c-st:#D9A94E; --c-cm:#7A8C86; --c-nm:#E38270; --c-out:#54B98C;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- shell ---------- */
+.shell{display:block}
+@media (min-width:1080px){
+  .shell{display:grid;grid-template-columns:248px minmax(0,1fr);align-items:start}
+}
+
+/* ---------- contents rail ---------- */
+.rail{border-bottom:1px solid var(--rule);background:var(--surface);padding:16px}
+.rail-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.rail nav{display:none}
+.rail[data-open="true"] nav{display:block;margin-top:12px}
+.rail-toggle{display:block;width:100%;text-align:left;background:none;border:1px solid var(--rule-strong);border-radius:2px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:8px 10px;cursor:pointer}
+.rail-toggle:hover{border-color:var(--accent)}
+@media (min-width:1080px){
+  .rail{position:sticky;top:0;height:100dvh;overflow-y:auto;border-bottom:none;border-right:1px solid var(--rule);padding:28px 20px 40px}
+  .rail nav{display:block}
+  .rail-toggle{display:none}
+}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.rail li{margin:0}
+.rail a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--ink-soft);font-size:13.5px;line-height:1.35;padding:5px 6px;border-radius:2px}
+.rail a:hover,.rail a.on{background:var(--accent-wash);color:var(--accent)}
+.rail a .n{font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:1.6em;font-variant-numeric:tabular-nums}
+.rail .sub a{font-size:12.5px;color:var(--muted)}
+.rail hr{border:0;border-top:1px solid var(--rule);margin:14px 0 10px}
+.theme-btn{margin-top:18px;background:none;border:1px solid var(--rule-strong);border-radius:2px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:6px 10px;cursor:pointer;width:100%;text-align:left}
+.theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- content ---------- */
+.content{padding-inline:clamp(16px,5vw,56px);padding-block:0 96px;min-width:0}
+.content > *{max-width:var(--measure);margin-inline:auto}
+.content > .wide{max-width:var(--wide)}
+section > *{max-width:100%}
+section{scroll-margin-top:12px}
+section + section{border-top:1px solid var(--rule);margin-top:64px}
+section > h2:first-child{margin-top:48px}
+#terms,#exercise,#next{scroll-margin-top:12px}
+
+/* ---------- masthead ---------- */
+.masthead{max-width:var(--wide);padding-block:clamp(40px,7vw,76px) 34px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:500;font-size:clamp(2.3rem,6.2vw,4rem);line-height:1.03;letter-spacing:-.022em;margin:0 0 20px;text-wrap:balance}
+.standfirst{font-family:var(--display);font-size:clamp(1.08rem,2.4vw,1.32rem);line-height:1.55;color:var(--ink-soft);max-width:60ch;margin:0}
+.byline{margin-top:24px;font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 18px}
+
+/* ---------- key figures strip ---------- */
+.figures{max-width:var(--wide);display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border-bottom:1px solid var(--rule);margin:0 auto 48px}
+.figures div{padding:18px 20px 20px;border-right:1px solid var(--rule)}
+.figures div:last-child{border-right:none}
+.figures dt{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.figures dd{margin:0;font-family:var(--display);font-size:1.75rem;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.01em}
+.figures dd small{display:block;font-family:var(--body);font-size:11.5px;color:var(--muted);margin-top:5px;letter-spacing:0;line-height:1.4}
+@media (max-width:620px){.figures div{border-right:none;border-bottom:1px solid var(--rule)}.figures div:last-child{border-bottom:none}}
+
+/* ---------- typography ---------- */
+h2{font-family:var(--display);font-weight:500;font-size:clamp(1.7rem,3.6vw,2.4rem);line-height:1.12;letter-spacing:-.018em;margin:72px 0 6px;text-wrap:balance}
+h2 .part{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;font-weight:500}
+h3{font-family:var(--display);font-weight:600;font-size:1.26rem;line-height:1.25;letter-spacing:-.008em;margin:40px 0 4px;text-wrap:balance}
+h4{font-family:var(--mono);font-weight:600;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:30px 0 4px}
+p{margin:14px 0}
+a{color:var(--accent)}
+strong{font-weight:600}
+em{font-style:italic}
+code{font-family:var(--mono);font-size:.86em;background:var(--surface-sunk);padding:1px 5px;border-radius:2px;border:1px solid var(--rule)}
+ul,ol{margin:14px 0;padding-left:1.25em}
+li{margin:7px 0}
+li::marker{color:var(--accent)}
+hr.sep{border:0;border-top:1px solid var(--rule);margin:56px auto;max-width:var(--measure)}
+.lede{font-size:1.06rem;color:var(--ink-soft)}
+
+/* ---------- callouts ---------- */
+.trap,.note,.aside,.yt{border-left:3px solid;padding:16px 18px;margin:26px 0;border-radius:0 2px 2px 0}
+.trap{border-color:var(--loss);background:var(--loss-wash)}
+.note{border-color:var(--amber);background:var(--amber-wash)}
+.aside{border-color:var(--accent);background:var(--accent-wash)}
+.yt{border-color:var(--rule-strong);background:var(--surface-sunk);font-size:14.5px;color:var(--ink-soft)}
+.label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:7px;font-weight:600}
+.trap .label{color:var(--loss)}
+.note .label{color:var(--amber)}
+.aside .label{color:var(--accent)}
+.yt .label{color:var(--muted)}
+.trap p:first-of-type,.note p:first-of-type,.aside p:first-of-type{margin-top:0}
+.trap p:last-child,.note p:last-child,.aside p:last-child{margin-bottom:0}
+blockquote.quote{margin:24px 0;padding:6px 0 6px 20px;border-left:2px solid var(--rule-strong);font-family:var(--display);font-style:italic;font-size:1.25rem;line-height:1.45;color:var(--ink-soft)}
+.big-idea{font-family:var(--display);font-size:1.4rem;line-height:1.35;letter-spacing:-.01em;color:var(--ink);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:18px 0;margin:30px 0;text-wrap:balance}
+.big-idea::before{content:"Key idea";display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+
+/* ---------- exhibits (figures stay on paper in both themes) ---------- */
+.exhibit{margin:34px auto;border:1px solid var(--rule);background:#FCFDFC;border-radius:2px;overflow:hidden}
+.exhibit .head{padding:11px 16px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:#5C6B66;background:#F1F4F3;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.exhibit .body{padding:20px 16px;overflow-x:auto;color:#101C19}
+.exhibit .body svg{display:block;width:100%;height:auto;max-width:100%}
+.exhibit figcaption{padding:12px 16px;border-top:1px solid var(--rule);font-size:13px;color:#4A5A55;background:#F1F4F3;line-height:1.5}
+.swipe{display:none}
+@media (max-width:620px){
+  .exhibit .body svg{min-width:600px}
+  .swipe{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:#5C6B66;padding:0 16px 10px;background:#FCFDFC}
+}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;margin:26px 0;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:440px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule-strong)}
+tbody tr:last-child td{border-bottom:none}
+td.k{font-weight:600}
+.terms td.k{white-space:nowrap}
+tr.hi td{background:var(--accent-wash)}
+
+/* ---------- code ---------- */
+.codewrap{margin:22px 0;border:1px solid var(--rule);border-radius:2px;overflow:hidden;background:var(--surface-sunk)}
+.codehead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);background:var(--surface)}
+.codewrap pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--ink);white-space:pre}
+.kw{color:var(--c-kw);font-weight:500}.fn{color:var(--c-fn)}.st{color:var(--c-st)}.cm{color:var(--c-cm);font-style:italic}.nm{color:var(--c-nm)}.out{color:var(--c-out)}.pmt{color:var(--muted);font-weight:600}.var{color:var(--ink)}.dec{color:var(--c-fn)}
+
+/* ---------- stat strip inside the article ---------- */
+.param-row{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:2px;background:var(--surface);margin:26px 0}
+.param-card{padding:16px 18px;border-right:1px solid var(--rule)}
+.param-card:last-child{border-right:none}
+.param-value{display:block;font-family:var(--display);font-size:1.7rem;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums}
+.param-label{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+.param-label strong{color:var(--ink)}
+
+/* ---------- before / after and two-view cards ---------- */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 10px}
+.ba > div{border:1px solid var(--rule);background:var(--surface);padding:14px 16px;border-radius:2px;font-size:14.5px;line-height:1.55}
+.ba .before{border-top:2px solid var(--loss)}
+.ba .after{border-top:2px solid var(--gain)}
+.ba .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:6px;font-weight:600}
+.ba .before .tag{color:var(--loss)}
+.ba .after .tag{color:var(--gain)}
+.other-uses{font-size:14px;color:var(--muted);margin-top:6px}
+
+/* ---------- roadmap ---------- */
+.roadmap{margin:26px 0;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+.phase{display:grid;grid-template-columns:132px 1fr;border-bottom:1px solid var(--rule)}
+.phase:last-child{border-bottom:none}
+.phase-tag{padding:14px 16px;font-family:var(--mono);border-right:1px solid var(--rule)}
+.phase-tag b{display:block;font-size:11px;letter-spacing:.12em;color:var(--accent);font-weight:600}
+.phase-tag span{display:block;font-size:10.5px;color:var(--muted);margin-top:3px}
+.phase-body{padding:13px 16px;font-size:14px;line-height:1.55;color:var(--ink-soft)}
+.phase-body strong{display:block;font-family:var(--display);font-size:1.08rem;font-weight:600;color:var(--ink);margin-bottom:3px}
+.phase.current{background:var(--accent-wash);box-shadow:inset 3px 0 0 var(--accent)}
+.here{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent);padding:1px 6px;border-radius:2px;margin-left:8px;vertical-align:3px;font-weight:600}
+
+/* ---------- boxes ---------- */
+.pathbox{border:1px solid var(--rule-strong);background:var(--surface);padding:18px 20px;margin:28px 0;border-radius:2px}
+.pathbox h4{margin-top:0}
+.pathbox ol,.pathbox ul{margin-bottom:0}
+.summary{border-top:2px solid var(--accent)}
+.summary li{font-size:15px}
+.decision{border:1px solid var(--rule);border-top:2px solid var(--accent);background:var(--surface);padding:18px 20px;margin:26px 0;border-radius:0 0 2px 2px}
+.decision .id{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);font-weight:600;text-transform:uppercase}
+.decision h5{font-family:var(--display);font-size:1.35rem;font-weight:600;margin:5px 0 10px;line-height:1.25}
+.decision p{margin:8px 0;color:var(--ink-soft)}
+
+footer{max-width:var(--wide);margin:80px auto 0;padding-top:24px;border-top:2px solid var(--ink);font-size:13px;color:var(--muted)}
+footer a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:620px){
+  .param-row,.ba{grid-template-columns:1fr}
+  .param-card{border-right:none;border-bottom:1px solid var(--rule)}
+  .param-card:last-child{border-bottom:none}
+  .phase{grid-template-columns:1fr}
+  .phase-tag{border-right:none;border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:baseline;padding:10px 16px}
+  .phase-tag span{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="rail" id="rail">
+  <p class="rail-title">Contents</p>
+  <button class="rail-toggle" id="railToggle" aria-expanded="false" aria-controls="railNav">Show contents</button>
+  <nav id="railNav">
+    <ol>
+      <li><a href="#s1"><span class="n">01</span><span>The paper that changed everything</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>Why the Transformer was invented</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Tokens, embeddings, positions</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>The attention mechanism</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>The full Transformer block</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Encoder, decoder, or both</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>Scale and why it matters</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Summary</span></a></li>
+    </ol>
+    <hr>
+    <ol class="sub">
+      <li><a href="#prev"><span class="n">←</span><span>Previously: Article #01</span></a></li>
+      <li><a href="#exercise"><span class="n">§</span><span>Learner exercise</span></a></li>
+      <li><a href="#next"><span class="n">→</span><span>Next: Article #03</span></a></li>
+    </ol>
+    <button class="theme-btn" id="themeBtn" type="button">Theme: auto</button>
+  </nav>
+</aside>
+
+<main class="content">
+
+<header class="masthead">
+  <p class="eyebrow">Generative AI Engineer Series · Article 02 · Phase 1: Foundations</p>
+  <h1>The Transformer Architecture</h1>
+  <p class="standfirst">The mechanism inside every LLM you've used. Why it replaced the models that came before it, how attention actually works, and what one Transformer layer does to a sentence, explained without a single equation.</p>
+  <p class="byline">
+    <span>~20 min read</span>
+    <span>6 figures</span>
+    <span>Prerequisite: Article #01</span>
+  </p>
+</header>
+
+<dl class="figures">
+  <div><dt>The paper</dt><dd>2017<small>"Attention Is All You Need", from researchers at Google</small></dd></div>
+  <div><dt>GPT-2 small</dt><dd>12 × 12<small>layers × attention heads per layer</small></dd></div>
+  <div><dt>GPT-3</dt><dd>96 × 96<small>layers × attention heads per layer</small></dd></div>
+  <div><dt>Recurrence used</dt><dd>0<small>every token is processed at the same time</small></dd></div>
+</dl>
+
+  <section id="s1">
+    <h2><span class="part">§ 01 · Hook</span>The Paper That Changed Everything</h2>
+
+    <div class="aside" id="prev">
+      <span class="label">Where we left off</span>
+      <p>In <strong>Article #01</strong> you met the Transformer as the "T" in GPT, and attention as a highlighter: as the model reads each word, it marks the other words that matter most for understanding it. You also saw that a language model is a next-token predictor, trained on trillions of tokens, that turns into an assistant through fine-tuning. This article opens up the machine behind all of that.</p>
+    </div>
+
+    <p>In 2017, a team of researchers at Google published a paper titled <em>"Attention Is All You Need."</em> It's one of the most influential papers in the history of AI. Every large language model you use today, whether it's Claude, GPT, Gemini, or Llama, is built on the architecture it introduced. Before that paper, the field was heading in a different direction. After it, almost everything changed.</p>
+
+    <p>This article isn't about memorising architecture diagrams; you can find those anywhere. It's about building real intuition: <strong>why</strong> each component exists, what problem it was designed to solve, and how the pieces fit together. By the end, you should be able to explain the Transformer to a friend in plain English without handwaving.</p>
+
+    <p>We'll use some mathematical intuition (dot products, softmax, weighted sums) but no equations. Code comes in later articles. Today is about the mental model, and as always, we start with the problem that needed solving.</p>
+  </section>
+
+  <section id="s2">
+    <h2><span class="part">§ 02 · The Problem</span>Why the Transformer Was Invented</h2>
+
+    <p>To appreciate a solution, you have to feel the pain of the problem first. Before Transformers, the standard way to process text was the <strong>Recurrent Neural Network</strong>, or RNN, and its more capable cousin, the <strong>LSTM</strong> (Long Short-Term Memory).</p>
+
+    <h3>How RNNs worked</h3>
+
+    <p>Imagine reading a sentence where you're only allowed to look at one word at a time, and after each word you have to summarise everything you've understood so far on a single sticky note before moving on. That sticky note is the <strong>hidden state</strong>.</p>
+
+    <p>An RNN processes tokens <em>sequentially, left to right</em>. It reads "The" and updates its hidden state. Then it reads "cat" and updates the hidden state again. Then "sat", "on", "the", "mat". By the time it reaches "mat", the hidden state is supposed to hold the model's compressed understanding of the whole sentence.</p>
+
+    <p>The trouble is that language isn't a conveyor belt. Words relate to other words that are far away, not only to the word right before them. That caused two big problems.</p>
+
+    <h3>Problem 1: sequential processing kills parallelism</h3>
+
+    <p>Each step depends on the output of the previous step, so you <strong>can't process tokens in parallel</strong>. You have to finish step 1 before you can start step 2. A modern GPU has thousands of cores that could be working at once (Article #01, §05), and an RNN leaves almost all of them idle. Training on long sequences was painfully slow.</p>
+
+    <h3>Problem 2: vanishing gradients destroy long-range memory</h3>
+
+    <p>Remember backpropagation from Article #01, the restaurant manager tracing a complaint backwards through every station? In an RNN, that backward trace has to pass through every single timestep. Over a long sequence, the gradient gets multiplied by the same weights again and again, and if those numbers are smaller than 1, the signal shrinks exponentially. By the time you're trying to connect a word to something 50 words earlier, the gradient is essentially zero, so the network can't learn the relationship.</p>
+
+    <p>This is the <strong>vanishing gradient problem</strong>. LSTMs were invented to address it. They added <em>memory gates</em>, small learned switches that decide at each step what to keep, what to forget, and what new information to add to the hidden state. Even so, LSTMs struggled with very long documents, and the sequential bottleneck stayed.</p>
+
+    <p>Think of the game of telephone, where a message is whispered from person to person down a long line. Each handoff loses a little detail, and by the 50th person the original sentence is unrecognisable. In an RNN, the "message" is the training signal travelling backwards from word 50 to word 1, and it degrades the same way.</p>
+
+    <div class="note">
+      <span class="label">Concrete example</span>
+      <p>Take the sentence <em>"The trophy didn't fit in the suitcase because <strong>it</strong> was too big."</em> What does "it" refer to? The trophy, obviously. But to work that out, you have to connect "it" (position 9) back to "trophy" (position 2). For a person, that's instant. For an RNN, the information about "trophy" has been compressed, diluted, and partly overwritten by seven later tokens by the time the model reaches "it", and the connection can get lost.</p>
+      <p>Sentences like this are called <em>Winograd schemas</em>. Researchers use them because resolving the pronoun takes real understanding of the situation, not surface pattern matching. (It's the same puzzle as "Priya lent Ananya her notes because she had missed the lecture" from Article #01.)</p>
+    </div>
+
+    <h3>The Transformer's radical proposal</h3>
+
+    <p>The paper's authors made a bold bet: <strong>throw away recurrence entirely.</strong> Instead of processing tokens one at a time, process them all at once, and use a mechanism called <em>attention</em> that lets every token relate directly to every other token in a single step, however far apart they are.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 1</span><span>Sequential (RNN) vs parallel (Transformer)</span></div><div class="body"><svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="a1m" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#5C6B66"/></marker></defs><text x="170" y="22" text-anchor="middle" font-size="13.5" font-weight="700" fill="#101C19">RNN: one token at a time</text><text x="170" y="38" text-anchor="middle" font-size="11" fill="#5C6B66">each step squeezes everything into one hidden state</text><rect x="14" y="54" width="34" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="31.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">The</text><rect x="55" y="54" width="46" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="78.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">trophy</text><rect x="108" y="54" width="42" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="129.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">didn't</text><rect x="157" y="54" width="30" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="172.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">fit</text><rect x="194" y="54" width="20" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="204.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">…</text><rect x="221" y="54" width="56" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="249.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">because</text><rect x="284" y="54" width="26" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="297.0" y="71.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">it</text><line x1="31.0" y1="82" x2="31.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="16.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><text x="31.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h1</text><line x1="47.0" y1="121" x2="61.0" y2="121" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><line x1="78.0" y1="82" x2="78.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="63.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><rect x="63.0" y="106.0" width="30" height="30.0" rx="2" fill="#0E6E62" fill-opacity="0.85"/><text x="78.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h2</text><line x1="94.0" y1="121" x2="112.0" y2="121" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><line x1="129.0" y1="82" x2="129.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="114.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><rect x="114.0" y="112.6" width="30" height="23.4" rx="2" fill="#0E6E62" fill-opacity="0.85"/><text x="129.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h3</text><line x1="145.0" y1="121" x2="155.0" y2="121" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><line x1="172.0" y1="82" x2="172.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="157.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><rect x="157.0" y="118.0" width="30" height="18.0" rx="2" fill="#0E6E62" fill-opacity="0.85"/><text x="172.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h4</text><line x1="188.0" y1="121" x2="187.0" y2="121" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><line x1="204.0" y1="82" x2="204.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="189.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><rect x="189.0" y="123.4" width="30" height="12.6" rx="2" fill="#0E6E62" fill-opacity="0.85"/><text x="204.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h5</text><line x1="220.0" y1="121" x2="232.0" y2="121" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><line x1="249.0" y1="82" x2="249.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="234.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><rect x="234.0" y="127.6" width="30" height="8.4" rx="2" fill="#0E6E62" fill-opacity="0.85"/><text x="249.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h6</text><line x1="265.0" y1="121" x2="280.0" y2="121" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><line x1="297.0" y1="82" x2="297.0" y2="102" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a1m)"/><rect x="282.0" y="106" width="30" height="30" rx="3" fill="#E9EDEB" stroke="#B4C0BC"/><rect x="282.0" y="131.2" width="30" height="4.8" rx="2" fill="#0E6E62" fill-opacity="0.85"/><text x="297.0" y="150" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">h7</text><rect x="20" y="170" width="10" height="10" fill="#0E6E62"/><text x="36" y="179" font-size="10.5" fill="#101C19">how much of "trophy" survives in each hidden state</text><text x="170" y="206" text-anchor="middle" font-size="11.5" fill="#33443F">By the time it reaches "it", the trophy signal has faded.</text><text x="170" y="236" text-anchor="middle" font-size="12" font-weight="600" fill="#B23A26">slow · forgets · can't run in parallel</text><line x1="350" y1="16" x2="350" y2="316" stroke="#D2DAD7" stroke-dasharray="4 4"/><text x="528" y="22" text-anchor="middle" font-size="13.5" font-weight="700" fill="#101C19">Transformer: all tokens at once</text><text x="528" y="38" text-anchor="middle" font-size="11" fill="#5C6B66">"it" looks straight at every earlier token</text><rect x="372" y="190" width="34" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="389.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">The</text><rect x="413" y="190" width="46" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="436.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">trophy</text><rect x="466" y="190" width="42" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="487.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">didn't</text><rect x="515" y="190" width="30" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="530.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">fit</text><rect x="552" y="190" width="20" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="562.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">…</text><rect x="579" y="190" width="56" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="607.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19">because</text><rect x="642" y="190" width="26" height="26" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="655.0" y="207.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">it</text><path d="M655.0,188 Q522.0,2 389.0,188" fill="none" stroke="#0E6E62" stroke-width="1.4" stroke-opacity="0.39"/><path d="M655.0,188 Q545.5,28 436.0,188" fill="none" stroke="#0E6E62" stroke-width="7.3" stroke-opacity="0.95"/><path d="M655.0,188 Q571.0,56 487.0,188" fill="none" stroke="#0E6E62" stroke-width="1.4" stroke-opacity="0.39"/><path d="M655.0,188 Q592.5,79 530.0,188" fill="none" stroke="#0E6E62" stroke-width="1.7" stroke-opacity="0.42"/><path d="M655.0,188 Q631.0,122 607.0,188" fill="none" stroke="#0E6E62" stroke-width="2.2" stroke-opacity="0.47"/><text x="436.0" y="236" text-anchor="middle" font-size="10.5" font-weight="600" fill="#0E6E62">0.70</text><text x="528" y="262" text-anchor="middle" font-size="11" fill="#5C6B66">thicker line = more attention. Distance does not matter.</text><text x="528" y="292" text-anchor="middle" font-size="12" font-weight="600" fill="#1B6B4C">fast · any distance · fully parallel</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Left: an RNN passes one compressed hidden state along, step by step, and the early tokens fade. Right: a Transformer connects "it" straight to every earlier token, weighted by learned relevance.</figcaption></figure>
+
+    <p>The result is that training can be spread across many GPUs at once, and any two tokens can influence each other directly. The information from "trophy" no longer has to survive a seven-step relay to reach "it". It arrives in one step, weighted by how relevant the attention mechanism decides it is.</p>
+  </section>
+
+  <section id="s3">
+    <h2><span class="part">§ 03 · Inputs</span>Tokens, Embeddings, and Positions</h2>
+
+    <p>Before we get to attention, let's look at what actually goes into the Transformer. The model doesn't see text, and it doesn't see letters. It sees numbers, specifically <em>dense</em> vectors: long lists of decimal numbers where most positions carry some meaning. (The opposite is a "sparse" representation such as one-hot encoding, where almost every position is zero.)</p>
+
+    <h3>Step 1: tokenisation</h3>
+
+    <p>First, the text is broken into <strong>tokens</strong>. In Article #01 we said you could think "token ≈ word". Here's the more precise picture. Most modern LLMs use <em>subword</em> tokenisation, usually a method called Byte-Pair Encoding (BPE). BPE notices which chunks of letters appear constantly in its training text, like "ing" or "tion", and gives those chunks their own tokens, while rare strings get chopped into smaller pieces. Common words may be a single token; rare or long words get split.</p>
+
+    <p>For example, <code>"Hello"</code> is usually one token, while a longer word like <code>"unbelievable"</code> might be split into two or three pieces. Code, numbers, and unusual words tend to break into more pieces. Article #03 goes deep on this. For now, just know that text becomes a sequence of integer IDs, one per token.</p>
+
+    <h3>Step 2: token embeddings</h3>
+
+    <p>Each token ID is looked up in an <strong>embedding table</strong>, a big matrix with one row per token. Each row is that token's vector. If a model's <strong>vocabulary</strong> (the fixed set of tokens it knows) has 50,000 tokens and each embedding has 768 numbers, the table is a 50,000 × 768 matrix. (GPT-2 is almost exactly this size: 50,257 tokens and 768 numbers each in its smallest version.)</p>
+
+    <p>These numbers encode meaning. Tokens with similar meanings end up with similar vectors: the vector for "king" sits closer to "queen" than to "car", and closer still to "monarch", because those words appear in similar contexts. The table isn't written by hand. It's learned during training, like every other parameter. Article #04 is entirely about embeddings.</p>
+
+    <h3>Step 3: positional encoding</h3>
+
+    <p>Here's a subtle problem. The Transformer looks at all the tokens <em>at the same time</em>, so unlike an RNN it has no built-in sense of order. "Dog bites man" and "man bites dog" would arrive as the same set of vectors, and the model wouldn't know which word came first.</p>
+
+    <p>The fix is <strong>positional encoding</strong>. Before the tokens go in, each token's embedding gets a small extra vector added to it that encodes its position in the sequence. It's like stamping each exam paper with the student's seat number before handing the whole pile over at once.</p>
+
+    <p>The original paper built these position vectors from fixed sine and cosine waves at different frequencies. Many later models learn their position vectors during training instead, and most recent LLMs use a scheme called Rotary Position Embeddings (RoPE), which rotates parts of each vector by an angle that depends on position rather than adding a separate vector. Article #05 covers RoPE properly. The principle is the same in every case: inject position information so the model knows the order of tokens even though it sees them all at once.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 2</span><span>From text to vectors</span></div><div class="body"><svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="a2m" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#5C6B66"/></marker></defs><text x="350" y="20" text-anchor="middle" font-size="13" font-style="italic" fill="#33443F">"The trophy didn't fit"</text><text x="18" y="62" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">1 · TOKENISE</text><text x="18" y="126" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">2 · LOOK UP</text><text x="18" y="140" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">EMBEDDING</text><text x="18" y="262" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">3 · ADD</text><text x="18" y="276" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">POSITION</text><rect x="130" y="42" width="100" height="30" rx="3" fill="#fff" stroke="#101C19" stroke-width="1.3"/><text x="180.0" y="61.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#101C19">The</text><text x="180" y="88" text-anchor="middle" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ID 464</text><line x1="180" y1="94" x2="180" y2="108" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a2m)"/><rect x="140" y="112" width="80" height="112" rx="3" fill="#E2EFEC" stroke="#2A9D8F" stroke-width="1.3"/><text x="180" y="132" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.82</text><text x="180" y="149" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.14</text><text x="180" y="166" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.67</text><text x="180" y="183" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">… 768 …</text><text x="180" y="208" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.31</text><text x="180" y="248" text-anchor="middle" font-size="16" font-weight="700" fill="#8A5E0F">+</text><rect x="146" y="258" width="68" height="26" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.2"/><text x="180" y="275" text-anchor="middle" font-size="10.5" font-weight="600" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">pos 1</text><rect x="265" y="42" width="100" height="30" rx="3" fill="#fff" stroke="#101C19" stroke-width="1.3"/><text x="315.0" y="61.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#101C19">trophy</text><text x="315" y="88" text-anchor="middle" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ID 9767</text><line x1="315" y1="94" x2="315" y2="108" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a2m)"/><rect x="275" y="112" width="80" height="112" rx="3" fill="#E2EFEC" stroke="#2A9D8F" stroke-width="1.3"/><text x="315" y="132" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.55</text><text x="315" y="149" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.88</text><text x="315" y="166" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.22</text><text x="315" y="183" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">… 768 …</text><text x="315" y="208" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.71</text><text x="315" y="248" text-anchor="middle" font-size="16" font-weight="700" fill="#8A5E0F">+</text><rect x="281" y="258" width="68" height="26" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.2"/><text x="315" y="275" text-anchor="middle" font-size="10.5" font-weight="600" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">pos 2</text><rect x="400" y="42" width="100" height="30" rx="3" fill="#fff" stroke="#101C19" stroke-width="1.3"/><text x="450.0" y="61.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#101C19">didn't</text><text x="450" y="88" text-anchor="middle" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ID 2134</text><line x1="450" y1="94" x2="450" y2="108" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a2m)"/><rect x="410" y="112" width="80" height="112" rx="3" fill="#E2EFEC" stroke="#2A9D8F" stroke-width="1.3"/><text x="450" y="132" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.43</text><text x="450" y="149" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.12</text><text x="450" y="166" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.94</text><text x="450" y="183" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">… 768 …</text><text x="450" y="208" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.61</text><text x="450" y="248" text-anchor="middle" font-size="16" font-weight="700" fill="#8A5E0F">+</text><rect x="416" y="258" width="68" height="26" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.2"/><text x="450" y="275" text-anchor="middle" font-size="10.5" font-weight="600" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">pos 3</text><rect x="535" y="42" width="100" height="30" rx="3" fill="#fff" stroke="#101C19" stroke-width="1.3"/><text x="585.0" y="61.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#101C19">fit</text><text x="585" y="88" text-anchor="middle" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ID 5322</text><line x1="585" y1="94" x2="585" y2="108" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a2m)"/><rect x="545" y="112" width="80" height="112" rx="3" fill="#E2EFEC" stroke="#2A9D8F" stroke-width="1.3"/><text x="585" y="132" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.19</text><text x="585" y="149" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">-0.77</text><text x="585" y="166" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.43</text><text x="585" y="183" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">… 768 …</text><text x="585" y="208" text-anchor="middle" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">+0.09</text><text x="585" y="248" text-anchor="middle" font-size="16" font-weight="700" fill="#8A5E0F">+</text><rect x="551" y="258" width="68" height="26" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.2"/><text x="585" y="275" text-anchor="middle" font-size="10.5" font-weight="600" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">pos 4</text><text x="350" y="316" text-anchor="middle" font-size="11" fill="#5C6B66">IDs and numbers are illustrative. Each position stamp works like a seat number on an exam paper.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Text → token IDs → embedding vectors (768 numbers each) → position added. This is what the first Transformer layer actually receives.</figcaption></figure>
+  </section>
+
+  <section id="s4">
+    <h2><span class="part">§ 04 · The Core Mechanism</span>The Attention Mechanism</h2>
+
+    <p>This is the most important section of the article, so take your time with it. We'll go from intuition to mechanism one step at a time.</p>
+
+    <h3>The intuition: your brain already does this</h3>
+
+    <p>Read this sentence: <em>"The animal didn't cross the street because it was too tired."</em></p>
+
+    <p>What does "it" refer to? The animal. You knew instantly, without effort. Your brain scanned back through the sentence, weighed what was relevant, and settled on "animal". You <em>attended</em> to the right word.</p>
+
+    <p>Attention in a Transformer is a mathematical version of that process, and it's the "highlighter" from Article #01 made precise. For each token, the model asks: <em>"how relevant is every other token to understanding this one, right now?"</em> Tokens with high relevance get high attention weights and contribute more to the result. Tokens with low relevance are mostly ignored.</p>
+
+    <h3>Query, Key, and Value</h3>
+
+    <p>This is where many explanations lose people. The Q-K-V idea sounds abstract, but a search engine makes it concrete.</p>
+
+    <div class="aside">
+      <span class="label">The search engine analogy</span>
+      <p>Say you search YouTube for "how to make pasta". That's your <strong>Query</strong>. YouTube compares it against the <strong>Keys</strong> of every video (the title, tags, and description), and the videos whose keys match best get high relevance scores. Then the <strong>Values</strong>, the actual video content, come back weighted by those scores. You don't get one video; you get a ranked, weighted mix of results.</p>
+      <p>Attention works the same way, except every token plays all three roles at once, for every other token.</p>
+    </div>
+
+    <p>In practice, each token's vector is turned into <em>three new vectors</em> by multiplying it by three separate learned matrices. This is the same weighted-sum arithmetic that happens inside every neuron (Article #01, §05), just done three times with three different sets of weights:</p>
+    <ul>
+      <li><strong>Query (Q):</strong> "What am I looking for?"</li>
+      <li><strong>Key (K):</strong> "What do I contain?"</li>
+      <li><strong>Value (V):</strong> "What do I contribute if you pick me?"</li>
+    </ul>
+
+    <h3>The attention computation, step by step</h3>
+
+    <p>For one token, say "it", the model does four things:</p>
+    <ol>
+      <li><strong>Score.</strong> Take the dot product of the Query vector for "it" with the Key vector of every token in the sequence. A dot product multiplies matching positions in two vectors and adds up the results, giving one number that says how well the two vectors line up. Vectors pointing in a similar direction give a large number; unrelated ones give something near zero. High score means high compatibility.</li>
+      <li><strong>Scale.</strong> Divide every score by the square root of the key vector's length (written √d_k). Without this, scores in big models get so large that the next step pushes nearly all the weight onto one token, and the gradients shrink towards zero, which is the vanishing-gradient problem from §02 turning up in a new place.</li>
+      <li><strong>Softmax.</strong> Turn the scaled scores into weights that add up to 1, using the same softmax you met in Article #01, §08. Think of it as converting raw scores into percentages that sum to 100%.</li>
+      <li><strong>Blend.</strong> Add up all the Value vectors, each multiplied by its weight. Picture a smoothie made from every token's Value vector, where highly attended tokens get poured in generously and the rest contribute barely a drop.</li>
+    </ol>
+
+    <p>The result is a new, richer vector for "it", one that has absorbed information from every relevant token. The word "it" now "knows" about "animal", because attention blended the Value vector of "animal" into its representation with a large weight.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 3</span><span>Single-head attention for the token "it"</span></div><div class="body"><svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><rect x="20" y="118" width="36" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="38.0" y="135.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">The</text><rect x="62" y="118" width="54" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="89.0" y="135.0" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">animal</text><rect x="122" y="118" width="46" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="145.0" y="135.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">didn't</text><rect x="174" y="118" width="44" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="196.0" y="135.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">cross</text><rect x="224" y="118" width="32" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="240.0" y="135.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">the</text><rect x="262" y="118" width="48" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="286.0" y="135.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">street</text><rect x="316" y="118" width="60" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="346.0" y="135.0" text-anchor="middle" font-size="11" font-weight="400" fill="#101C19">because</text><rect x="382" y="118" width="26" height="26" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="395.0" y="135.0" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">it</text><path d="M395.0,116 Q216.5,-21 38.0,116" fill="none" stroke="#0E6E62" stroke-width="0.9" stroke-opacity="0.45"/><path d="M395.0,116 Q242.0,-6 89.0,116" fill="none" stroke="#0E6E62" stroke-width="8.0" stroke-opacity="0.9"/><path d="M395.0,116 Q270.0,11 145.0,116" fill="none" stroke="#0E6E62" stroke-width="1.2" stroke-opacity="0.45"/><path d="M395.0,116 Q295.5,26 196.0,116" fill="none" stroke="#0E6E62" stroke-width="1.0" stroke-opacity="0.45"/><path d="M395.0,116 Q317.5,40 240.0,116" fill="none" stroke="#0E6E62" stroke-width="0.9" stroke-opacity="0.45"/><path d="M395.0,116 Q340.5,53 286.0,116" fill="none" stroke="#0E6E62" stroke-width="1.3" stroke-opacity="0.45"/><path d="M395.0,116 Q370.5,71 346.0,116" fill="none" stroke="#0E6E62" stroke-width="1.1" stroke-opacity="0.45"/><text x="200" y="22" text-anchor="middle" font-size="12.5" font-style="italic" fill="#33443F">"The animal didn't cross the street because it …"</text><text x="200" y="168" text-anchor="middle" font-size="10.5" fill="#5C6B66">in a decoder, "it" can only look back at earlier tokens (and itself)</text><text x="470" y="22" font-size="11" font-weight="700" fill="#101C19">Attention weights from "it"</text><text x="530" y="46" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">The</text><rect x="538" y="37" width="2.0" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="544.0" y="46" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">1%</text><text x="530" y="63" text-anchor="end" font-size="10.5" fill="#0E6E62" font-weight="600">animal</text><rect x="538" y="54" width="136.8" height="11" rx="2" fill="#0E6E62" fill-opacity="1"/><text x="678.8" y="63" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">72%</text><text x="530" y="80" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">didn't</text><rect x="538" y="71" width="7.6" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="549.6" y="80" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">4%</text><text x="530" y="97" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">cross</text><rect x="538" y="88" width="3.8" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="545.8" y="97" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">2%</text><text x="530" y="114" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">the</text><rect x="538" y="105" width="2.0" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="544.0" y="114" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">1%</text><text x="530" y="131" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">street</text><rect x="538" y="122" width="9.5" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="551.5" y="131" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">5%</text><text x="530" y="148" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">because</text><rect x="538" y="139" width="5.7" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="547.7" y="148" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">3%</text><text x="530" y="165" text-anchor="end" font-size="10.5" fill="#101C19" font-weight="400">it</text><rect x="538" y="156" width="22.8" height="11" rx="2" fill="#2A9D8F" fill-opacity="0.6"/><text x="564.8" y="165" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">12%</text><text x="538" y="184" font-size="9.5" fill="#5C6B66">sums to 100%</text><rect x="20" y="214" width="156" height="92" rx="3" fill="#fff" stroke="#0E6E62" stroke-width="1.5"/><text x="32" y="236" font-size="11.5" font-weight="700" fill="#0E6E62">1 · Score</text><text x="32" y="258" font-size="9.8" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">Q(it)·K(animal) = 3.2</text><text x="32" y="275" font-size="9.8" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">Q(it)·K(street) = 0.5</text><rect x="188" y="214" width="156" height="92" rx="3" fill="#fff" stroke="#33443F" stroke-width="1.5"/><text x="200" y="236" font-size="11.5" font-weight="700" fill="#33443F">2 · Scale</text><text x="200" y="258" font-size="9.8" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">divide by √d_k</text><text x="200" y="275" font-size="9.8" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">keeps softmax healthy</text><rect x="356" y="214" width="156" height="92" rx="3" fill="#fff" stroke="#2A9D8F" stroke-width="1.5"/><text x="368" y="236" font-size="11.5" font-weight="700" fill="#2A9D8F">3 · Softmax</text><text x="368" y="258" font-size="9.8" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">3.2 → 72%</text><text x="368" y="275" font-size="9.8" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">0.5 → 5%</text><rect x="524" y="214" width="156" height="92" rx="3" fill="#fff" stroke="#1B6B4C" stroke-width="1.5"/><text x="536" y="236" font-size="11.5" font-weight="700" fill="#1B6B4C">4 · Blend</text><text x="536" y="258" font-size="9.8" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">0.72 × V(animal)</text><text x="536" y="275" font-size="9.8" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">+ 0.12 × V(it)</text><text x="536" y="292" font-size="9.8" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">+ 0.05 × V(street) …</text><text x="350" y="340" text-anchor="middle" font-size="11" fill="#5C6B66">Illustrative numbers, chosen so the scores and the percentages agree with each other.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>"it" scores every earlier token. "animal" wins with 72% of the weight, so the new vector for "it" is mostly built from the Value of "animal".</figcaption></figure>
+
+    <h3>Multi-head attention</h3>
+
+    <p>One attention operation tends to capture one <em>kind</em> of relationship. But language is rich, and tokens relate to each other in several ways at once.</p>
+
+    <p><strong>Multi-head attention</strong> runs several independent attention operations side by side. Each "head" has its own Q, K, and V matrices, so it can learn to look for different patterns. The outputs of all the heads are joined together (concatenated) and passed through one more learned matrix to produce the final result.</p>
+
+    <div class="aside">
+      <span class="label">Analogy</span>
+      <p>Think of reading a novel several times, each time with a different focus: once for the plot, once for the relationships between characters, once for foreshadowing, once for symbolism. Multi-head attention does all of those readings at the same time, and then combines them into one rich understanding.</p>
+    </div>
+
+    <figure class="exhibit"><div class="head"><span>Figure 4</span><span>Multi-head attention: four heads, four kinds of relationship</span></div><div class="body"><svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="a4m" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#5C6B66"/></marker></defs><rect x="14" y="14" width="158" height="170" rx="3" fill="#fff" stroke="#0E6E62" stroke-width="1.6"/><rect x="14" y="14" width="158" height="4" fill="#0E6E62"/><text x="93" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#0E6E62">Head 1</text><text x="93" y="60" text-anchor="middle" font-size="11" font-style="italic" fill="#33443F">who is "it"?</text><rect x="24" y="86" width="58" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="53.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">it</text><line x1="86" y1="99" x2="100" y2="99" stroke="#0E6E62" stroke-width="2" marker-end="url(#a4m)"/><rect x="104" y="86" width="58" height="26" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="133.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">animal</text><text x="93" y="170" text-anchor="middle" font-size="9.5" fill="#5C6B66">own Q, K, V matrices</text><line x1="93" y1="186" x2="93" y2="206" stroke="#5C6B66" stroke-width="1.2"/><rect x="184" y="14" width="158" height="170" rx="3" fill="#fff" stroke="#2A9D8F" stroke-width="1.6"/><rect x="184" y="14" width="158" height="4" fill="#2A9D8F"/><text x="263" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#2A9D8F">Head 2</text><text x="263" y="60" text-anchor="middle" font-size="11" font-style="italic" fill="#33443F">who did what?</text><rect x="194" y="86" width="58" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="223.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">animal</text><line x1="256" y1="99" x2="270" y2="99" stroke="#2A9D8F" stroke-width="2" marker-end="url(#a4m)"/><rect x="274" y="86" width="58" height="26" rx="3" fill="#E2EFEC" stroke="#2A9D8F" stroke-width="1.3"/><text x="303.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">cross</text><text x="263" y="170" text-anchor="middle" font-size="9.5" fill="#5C6B66">own Q, K, V matrices</text><line x1="263" y1="186" x2="263" y2="206" stroke="#5C6B66" stroke-width="1.2"/><rect x="354" y="14" width="158" height="170" rx="3" fill="#fff" stroke="#8A5E0F" stroke-width="1.6"/><rect x="354" y="14" width="158" height="4" fill="#8A5E0F"/><text x="433" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#8A5E0F">Head 3</text><text x="433" y="60" text-anchor="middle" font-size="11" font-style="italic" fill="#33443F">what describes what?</text><rect x="364" y="86" width="58" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="393.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">tired</text><line x1="426" y1="99" x2="440" y2="99" stroke="#8A5E0F" stroke-width="2" marker-end="url(#a4m)"/><rect x="444" y="86" width="58" height="26" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.3"/><text x="473.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">too</text><text x="433" y="170" text-anchor="middle" font-size="9.5" fill="#5C6B66">own Q, K, V matrices</text><line x1="433" y1="186" x2="433" y2="206" stroke="#5C6B66" stroke-width="1.2"/><rect x="524" y="14" width="158" height="170" rx="3" fill="#fff" stroke="#33443F" stroke-width="1.6"/><rect x="524" y="14" width="158" height="4" fill="#33443F"/><text x="603" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#33443F">Head 4</text><text x="603" y="60" text-anchor="middle" font-size="11" font-style="italic" fill="#33443F">who is next to me?</text><rect x="534" y="86" width="58" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="563.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">it</text><line x1="596" y1="99" x2="610" y2="99" stroke="#33443F" stroke-width="2" marker-end="url(#a4m)"/><rect x="614" y="86" width="58" height="26" rx="3" fill="#E9EDEB" stroke="#33443F" stroke-width="1.3"/><text x="643.0" y="103.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">because</text><rect x="534" y="130" width="58" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="563.0" y="147.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">was</text><line x1="596" y1="143" x2="610" y2="143" stroke="#33443F" stroke-width="2" marker-end="url(#a4m)"/><rect x="614" y="130" width="58" height="26" rx="3" fill="#E9EDEB" stroke="#33443F" stroke-width="1.3"/><text x="643.0" y="147.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19">it</text><text x="603" y="170" text-anchor="middle" font-size="9.5" fill="#5C6B66">own Q, K, V matrices</text><line x1="603" y1="186" x2="603" y2="206" stroke="#5C6B66" stroke-width="1.2"/><line x1="93" y1="206" x2="603" y2="206" stroke="#5C6B66" stroke-width="1.2"/><line x1="350" y1="206" x2="350" y2="226" stroke="#5C6B66" stroke-width="1.2" marker-end="url(#a4m)"/><rect x="220" y="230" width="260" height="40" rx="3" fill="#101C19"/><text x="350" y="255" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Concatenate → linear projection</text><text x="350" y="292" text-anchor="middle" font-size="11" fill="#33443F">one enriched vector per token, combining every head's view</text><text x="350" y="316" text-anchor="middle" font-size="10.5" fill="#5C6B66">Illustrative roles. Real heads learn their own specialities during training, and many are messier than this.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Each head reads the same sentence with its own learned interests. Their outputs are combined into one vector per token.</figcaption></figure>
+
+    <p>The smallest GPT-2 has 12 attention heads in each layer, and GPT-3 has 96. Nobody tells a head what to specialise in. Each one works out a useful pattern during training, the same way the feature detectors in Article #01, §05 emerged without being programmed. (Article #05 goes much deeper into attention, including what researchers find when they look inside real heads.)</p>
+  </section>
+
+  <section id="s5">
+    <h2><span class="part">§ 05 · The Architecture</span>The Full Transformer Block</h2>
+
+    <p>Attention is the heart of the Transformer, but it isn't the whole thing. A Transformer is a stack of identical <strong>blocks</strong> (also called layers), and each pass through a block refines the token vectors a little more. Each block has four parts, always in the same order.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 5</span><span>One Transformer block, repeated N times</span></div><div class="body"><svg viewBox="0 0 700 470" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><defs><marker id="a5m" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#5C6B66"/></marker><marker id="a5r" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#8A5E0F"/></marker></defs><rect x="205.0" y="20" width="250" height="40" rx="3" fill="#101C19" stroke="#101C19" stroke-width="1.6"/><text x="330" y="45" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Input tokens (x)</text><line x1="330" y1="60" x2="330" y2="88" stroke="#5C6B66" stroke-width="1.5" marker-end="url(#a5m)"/><rect x="205.0" y="92" width="250" height="48" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.6"/><text x="330" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#0E6E62">Multi-head self-attention</text><text x="330" y="129" text-anchor="middle" font-size="10.5" fill="#33443F">Q, K, V projections → weighted blend</text><line x1="330" y1="140" x2="330" y2="168" stroke="#5C6B66" stroke-width="1.5" marker-end="url(#a5m)"/><rect x="205.0" y="172" width="250" height="48" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.6"/><text x="330" y="192" text-anchor="middle" font-size="13" font-weight="700" fill="#8A5E0F">Add & Norm</text><text x="330" y="209" text-anchor="middle" font-size="10.5" fill="#33443F">x + Attention(x), then layer norm</text><line x1="330" y1="220" x2="330" y2="240" stroke="#5C6B66" stroke-width="1.5" marker-end="url(#a5m)"/><rect x="205.0" y="244" width="250" height="48" rx="3" fill="#E3EFE8" stroke="#1B6B4C" stroke-width="1.6"/><text x="330" y="264" text-anchor="middle" font-size="13" font-weight="700" fill="#1B6B4C">Feed-forward network (FFN)</text><text x="330" y="281" text-anchor="middle" font-size="10.5" fill="#33443F">2-layer MLP, applied to each token</text><line x1="330" y1="292" x2="330" y2="320" stroke="#5C6B66" stroke-width="1.5" marker-end="url(#a5m)"/><rect x="205.0" y="324" width="250" height="48" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.6"/><text x="330" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="#8A5E0F">Add & Norm</text><text x="330" y="361" text-anchor="middle" font-size="10.5" fill="#33443F">x + FFN(x), then layer norm</text><line x1="330" y1="372" x2="330" y2="392" stroke="#5C6B66" stroke-width="1.5" marker-end="url(#a5m)"/><rect x="205.0" y="396" width="250" height="40" rx="3" fill="#101C19" stroke="#101C19" stroke-width="1.6"/><text x="330" y="421" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">Enriched tokens (x′)</text><path d="M205,66 C 130,66 130,196 201,196" fill="none" stroke="#8A5E0F" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#a5r)"/><path d="M205,230 C 130,230 130,348 201,348" fill="none" stroke="#8A5E0F" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#a5r)"/><text x="120" y="136" text-anchor="end" font-size="11" fill="#8A5E0F" font-weight="600">residual</text><text x="120" y="151" text-anchor="end" font-size="10.5" fill="#5C6B66">bypass lane</text><text x="120" y="294" text-anchor="end" font-size="11" fill="#8A5E0F" font-weight="600">residual</text><text x="120" y="309" text-anchor="end" font-size="10.5" fill="#5C6B66">bypass lane</text><path d="M475,92 L490,92 L490,372 L475,372" fill="none" stroke="#B4C0BC" stroke-width="2"/><text x="502" y="220" font-size="14" font-weight="700" fill="#101C19">× N layers</text><text x="502" y="240" font-size="11" fill="#5C6B66">12 in GPT-2 small</text><text x="502" y="256" font-size="11" fill="#5C6B66">96 in GPT-3</text><text x="350" y="460" text-anchor="middle" font-size="10.5" fill="#5C6B66">Drawn as in the original 2017 paper. Most modern LLMs move each norm to just before its sub-layer.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Attention, then Add &amp; Norm, then the feed-forward network, then Add &amp; Norm again. The dashed bypass lanes are the residual connections.</figcaption></figure>
+
+    <h3>Part 1: multi-head self-attention</h3>
+    <p>Each token looks at the others, weighted by learned relevance, exactly as in §04. The output is a new vector for each token, informed by the whole context.</p>
+
+    <h3>Parts 2 and 4: Add &amp; Norm</h3>
+    <p>This step has two pieces. The first is the <strong>residual connection</strong>: the input to the attention step is <em>added back</em> to its output (<code>x + Attention(x)</code>). The idea comes from ResNets (Residual Networks), an image-recognition architecture from 2015 that made this shortcut famous.</p>
+
+    <p>Think of it as a bypass lane on a highway. The training signal can skip straight past a layer and flow backwards, so even if one layer is struggling to learn anything useful, the earlier layers still get a clear signal. That's what makes very deep networks trainable. It also means each block only has to learn "what to change" about its input, rather than rebuilding the whole output from scratch, which is a much easier job.</p>
+
+    <p>The second piece is <strong>layer normalisation</strong>. It rescales the numbers flowing through each layer so they stay in a steady, well-behaved range (centred around zero, without wild swings in size). Without it, values can drift towards extremes as they pass through dozens of layers, and training becomes unstable.</p>
+
+    <div class="note">
+      <span class="label">A small modern twist</span>
+      <p>The 2017 paper normalised <em>after</em> each step, as drawn in Figure 5. Most modern LLMs normalise just <em>before</em> each step instead, because it makes very deep stacks train more reliably. The ingredients are the same; only the order changed.</p>
+    </div>
+
+    <h3>Part 3: the feed-forward network (FFN)</h3>
+    <p>Once attention has decided which tokens relate to which, a small two-layer neural network, the same kind of layered network you met in Article #01, §05, is applied to <em>each token separately</em>. It expands the vector to a larger size, applies a non-linear "bend", then shrinks it back. GPT-2 uses GELU for the bend, a smoother cousin of the ReLU from Article #01, and many newer models use related variants.</p>
+
+    <p>Research suggests the FFN layers are where much of a model's stored knowledge lives: facts, domain patterns, common associations. Attention decides <em>which</em> tokens relate to each other; the FFN works out <em>what to do</em> with that information. The two complement each other.</p>
+
+    <p>After N passes through this block, the token vectors are rich and deeply shaped by context. That's 12 blocks in the smallest GPT-2 and 96 in GPT-3.</p>
+  </section>
+
+  <section id="s6">
+    <h2><span class="part">§ 06 · Model Families</span>Encoder, Decoder, or Both</h2>
+
+    <p>The original Transformer was designed for machine translation, which takes one sequence in and produces another sequence out. It had two stacks of blocks: an <strong>encoder</strong> to understand the input sentence, and a <strong>decoder</strong> to generate the translation. Since then, people have found that many jobs only need one of the two stacks, which gives three families of models.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 6</span><span>Three Transformer families</span></div><div class="body"><svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><rect x="14" y="14" width="214" height="330" rx="3" fill="#fff" stroke="#2A9D8F" stroke-width="1.5"/><rect x="14" y="14" width="214" height="4" fill="#2A9D8F"/><text x="121" y="44" text-anchor="middle" font-size="14.5" font-weight="700" fill="#2A9D8F">Encoder-only</text><text x="121" y="62" text-anchor="middle" font-size="11" fill="#5C6B66">reads and understands</text><rect x="82.0" y="100" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="95.0" y="100" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="108.0" y="100" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="121.0" y="100" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="134.0" y="100" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="147.0" y="100" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="82.0" y="113" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="95.0" y="113" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="108.0" y="113" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="121.0" y="113" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="134.0" y="113" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="147.0" y="113" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="82.0" y="126" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="95.0" y="126" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="108.0" y="126" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="121.0" y="126" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="134.0" y="126" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="147.0" y="126" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="82.0" y="139" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="95.0" y="139" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="108.0" y="139" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="121.0" y="139" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="134.0" y="139" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="147.0" y="139" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="82.0" y="152" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="95.0" y="152" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="108.0" y="152" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="121.0" y="152" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="134.0" y="152" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="147.0" y="152" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="82.0" y="165" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="95.0" y="165" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="108.0" y="165" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="121.0" y="165" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="134.0" y="165" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="147.0" y="165" width="11" height="11" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><text x="121" y="202" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ATTENTION PATTERN</text><text x="121" y="226" text-anchor="middle" font-size="12.5" font-weight="700" fill="#101C19">Bidirectional</text><text x="121" y="244" text-anchor="middle" font-size="10.5" fill="#5C6B66">every token sees every token</text><line x1="34" y1="272" x2="208" y2="272" stroke="#D2DAD7"/><text x="121" y="296" text-anchor="middle" font-size="12" font-weight="600" fill="#2A9D8F">BERT, RoBERTa</text><text x="121" y="318" text-anchor="middle" font-size="10.5" fill="#5C6B66">classification, embeddings, NER</text><rect x="242" y="14" width="214" height="330" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="2.4"/><rect x="242" y="14" width="214" height="4" fill="#0E6E62"/><text x="349" y="44" text-anchor="middle" font-size="14.5" font-weight="700" fill="#0E6E62">Decoder-only</text><text x="349" y="62" text-anchor="middle" font-size="11" fill="#5C6B66">generates text</text><rect x="284" y="72" width="130" height="20" rx="2" fill="#0E6E62"/><text x="349" y="86" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" style="font-family:'IBM Plex Mono',monospace">WHAT LLMS USE</text><rect x="310.0" y="100" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="323.0" y="100" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="336.0" y="100" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="349.0" y="100" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="362.0" y="100" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="375.0" y="100" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="310.0" y="113" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="323.0" y="113" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="336.0" y="113" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="349.0" y="113" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="362.0" y="113" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="375.0" y="113" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="310.0" y="126" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="323.0" y="126" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="336.0" y="126" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="349.0" y="126" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="362.0" y="126" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="375.0" y="126" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="310.0" y="139" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="323.0" y="139" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="336.0" y="139" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="349.0" y="139" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="362.0" y="139" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="375.0" y="139" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="310.0" y="152" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="323.0" y="152" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="336.0" y="152" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="349.0" y="152" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="362.0" y="152" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="375.0" y="152" width="11" height="11" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="310.0" y="165" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="323.0" y="165" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="336.0" y="165" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="349.0" y="165" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="362.0" y="165" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="375.0" y="165" width="11" height="11" rx="1" fill="#0E6E62" fill-opacity="0.85"/><text x="349" y="202" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ATTENTION PATTERN</text><text x="349" y="226" text-anchor="middle" font-size="12.5" font-weight="700" fill="#101C19">Causal (masked)</text><text x="349" y="244" text-anchor="middle" font-size="10.5" fill="#5C6B66">each token sees only the past</text><line x1="262" y1="272" x2="436" y2="272" stroke="#D2DAD7"/><text x="349" y="296" text-anchor="middle" font-size="12" font-weight="600" fill="#0E6E62">GPT, Llama, Mistral</text><text x="349" y="318" text-anchor="middle" font-size="10.5" fill="#5C6B66">chat, writing, code</text><rect x="470" y="14" width="214" height="330" rx="3" fill="#fff" stroke="#8A5E0F" stroke-width="1.5"/><rect x="470" y="14" width="214" height="4" fill="#8A5E0F"/><text x="577" y="44" text-anchor="middle" font-size="14.5" font-weight="700" fill="#8A5E0F">Encoder-decoder</text><text x="577" y="62" text-anchor="middle" font-size="11" fill="#5C6B66">reads, then writes</text><rect x="506" y="104" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="518" y="104" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="530" y="104" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="542" y="104" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="554" y="104" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="506" y="116" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="518" y="116" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="530" y="116" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="542" y="116" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="554" y="116" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="506" y="128" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="518" y="128" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="530" y="128" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="542" y="128" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="554" y="128" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="506" y="140" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="518" y="140" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="530" y="140" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="542" y="140" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="554" y="140" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="506" y="152" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="518" y="152" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="530" y="152" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="542" y="152" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="554" y="152" width="10" height="10" rx="1" fill="#2A9D8F" fill-opacity="0.85"/><rect x="588" y="104" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="600" y="104" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="612" y="104" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="624" y="104" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="636" y="104" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="588" y="116" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="600" y="116" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="612" y="116" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="624" y="116" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="636" y="116" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="588" y="128" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="600" y="128" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="612" y="128" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="624" y="128" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="636" y="128" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="588" y="140" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="600" y="140" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="612" y="140" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="624" y="140" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="636" y="140" width="10" height="10" rx="1" fill="#E9EDEB" fill-opacity="1"/><rect x="588" y="152" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="600" y="152" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="612" y="152" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="624" y="152" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><rect x="636" y="152" width="10" height="10" rx="1" fill="#0E6E62" fill-opacity="0.85"/><text x="536" y="178" text-anchor="middle" font-size="9.5" fill="#5C6B66">encoder</text><text x="618" y="178" text-anchor="middle" font-size="9.5" fill="#5C6B66">decoder</text><text x="577" y="202" text-anchor="middle" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">ATTENTION PATTERN</text><text x="577" y="226" text-anchor="middle" font-size="12.5" font-weight="700" fill="#101C19">Both</text><text x="577" y="244" text-anchor="middle" font-size="10.5" fill="#5C6B66">encoder reads all;</text><text x="577" y="258" text-anchor="middle" font-size="10.5" fill="#5C6B66">decoder looks back + at the encoder</text><line x1="490" y1="272" x2="664" y2="272" stroke="#D2DAD7"/><text x="577" y="296" text-anchor="middle" font-size="12" font-weight="600" fill="#8A5E0F">T5, BART</text><text x="577" y="318" text-anchor="middle" font-size="10.5" fill="#5C6B66">translation, summarisation</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>The grids show which tokens each token may attend to. A filled square in row r, column c means "token r can look at token c".</figcaption></figure>
+
+    <h3>Encoder-only (for example BERT)</h3>
+    <p>These models read and understand text. Attention is <strong>bidirectional</strong>: every token can look at every other token, before and after it. They're excellent for classification, for <strong>named entity recognition</strong> (automatically finding and labelling the names of people, places, and organisations in text), and for producing embeddings. They aren't built to generate text.</p>
+
+    <h3>Decoder-only (for example GPT, Llama, Mistral)</h3>
+    <p>These models generate text one token at a time, the autoregressive loop from Article #01, §08. Attention is <strong>causal</strong>, also called <em>masked</em>: each token can only look at the tokens <em>before</em> it. That's essential, because the model is trained to predict the next token, and if it could see the future there would be nothing to learn. It's the same reason your phone's predictive text can't peek at the word you haven't typed yet.</p>
+
+    <h3>Encoder-decoder (for example T5, BART)</h3>
+    <p>These models read the whole input with a bidirectional encoder, then generate the output with a causal decoder that also looks back at the encoder's results. They suit tasks where the input and output are clearly separate texts, such as translation and summarisation.</p>
+
+    <div class="aside">
+      <span class="label">Key takeaway</span>
+      <p>When people say "LLM", they almost always mean a <strong>decoder-only Transformer</strong>. The GPT, Llama, and Mistral families are all decoder-only, and so, as far as their makers have described them, are most of today's chat models. That's the architecture this series focuses on from here.</p>
+    </div>
+  </section>
+
+  <section id="s7">
+    <h2><span class="part">§ 07 · Scale</span>Scale and Why It Matters</h2>
+
+    <p>One of the most striking facts about modern AI is that the core architecture from the 2017 paper is still recognisably the one inside today's frontier models. Details have been refined (where the norms sit, how positions are encoded, which activation is used), but what really changed was <em>scale</em>.</p>
+
+    <div class="param-row">
+      <div class="param-card"><span class="param-value">1.5B</span><span class="param-label"><strong>GPT-2 (2019)</strong><br>parameters</span></div>
+      <div class="param-card"><span class="param-value">175B</span><span class="param-label"><strong>GPT-3 (2020)</strong><br>parameters</span></div>
+      <div class="param-card"><span class="param-value">~1T+</span><span class="param-label"><strong>Frontier models (2023 onward)</strong><br>estimated; most don't publish exact counts</span></div>
+    </div>
+
+    <p>The Transformer's <strong>parallel design</strong> is what makes this scaling possible. Because every token in a sequence is processed at once, the work can be spread across thousands of GPUs. More chips, more data, bigger models: the architecture keeps scaling where RNNs stalled.</p>
+
+    <h3>Emergent abilities</h3>
+
+    <p>As Article #01, §16 described, bigger models trained on more data have shown abilities nobody explicitly trained for: multi-step arithmetic, chain-of-thought reasoning (writing out steps before answering), analogies, and in-context learning, where a model picks up a new task from a few examples in the prompt without any change to its weights.</p>
+
+    <p>Researchers still debate how sudden these jumps really are, since part of the apparent suddenness can come from all-or-nothing scoring. Either way, nobody designed these abilities in. They came as a by-product of learning to predict text at enough scale, and the Transformer turned out to be an unusually good architecture for soaking up that structure.</p>
+
+    <h3>Same architecture, very different model</h3>
+
+    <p>What turns a raw, pre-trained Transformer into the helpful assistant you chat with? You met the answer in Article #01, §12: supervised fine-tuning on curated instruction-response pairs, then preference training such as RLHF. None of it changes the architecture. It changes what the model has learned to <em>do</em> with it. Phase 2 of this series (Articles #11 and #12) shows how fine-tuning is actually done. Next, though, we zoom in on the very first step of the pipeline: tokenisation.</p>
+  </section>
+
+  <section id="s8">
+    <h2><span class="part">§ 08 · Summary</span>The Mental Model You Now Have</h2>
+    <div class="pathbox summary">
+      <h4>Six things to take with you</h4>
+      <ul>
+        <li><strong>The problem:</strong> RNNs read text one token at a time, so they were slow to train and forgot long-range context. The Transformer processes all tokens at once.</li>
+        <li><strong>Attention:</strong> each token scores the other tokens it's allowed to see (Query · Key), turns the scores into weights with softmax, and blends their Values. In a decoder, a token can only see the tokens before it.</li>
+        <li><strong>Multi-head attention:</strong> several heads run side by side, each learning a different kind of relationship. Their outputs are combined into one vector per token.</li>
+        <li><strong>The full block:</strong> attention → Add &amp; Norm → feed-forward network → Add &amp; Norm, repeated N times. Residual connections keep deep stacks trainable.</li>
+        <li><strong>Three families:</strong> encoder-only (BERT), decoder-only (GPT, Llama), encoder-decoder (T5). LLMs are decoder-only, with causal attention.</li>
+        <li><strong>Scale:</strong> the 2017 blueprint plus more parameters, data, and compute gave us today's models. The design was refined, but the big change was size.</li>
+      </ul>
+    </div>
+
+    <div class="pathbox" id="exercise">
+      <h4>📝 Learner exercise</h4>
+      <ol>
+        <li><strong>Be the attention head.</strong> For the sentence "Ananya put the book on the table because it was heavy", decide which earlier word "it" should attend to most. Then change "heavy" to "wobbly". What changes, and why can't an RNN easily make that switch?</li>
+        <li><strong>Draw the mask.</strong> On paper, draw the 5 × 5 attention grid for the sentence "the monsoon arrived early today" in a decoder-only model. Shade the squares each token is allowed to see. How many squares are shaded?</li>
+        <li><strong>Check the arithmetic.</strong> Figure 3 gives "animal" a score of 3.2 and "street" a score of 0.5. Using the softmax idea from Article #01, explain why a gap of 2.7 in scores turns into a gap of 72% versus 5% in weights.</li>
+      </ol>
+    </div>
+
+    <div class="decision" id="next">
+      <span class="id">Next in the series → Article #03</span>
+      <h5>Tokenisation: How Text Becomes Numbers</h5>
+      <p>Now that you know the architecture, we zoom in on the very first step: how raw text becomes the numbers the Transformer works with. We'll open up Byte-Pair Encoding, watch a tokeniser being trained, and see why tokens aren't words, and why that matters for prompting, pricing, and some famous model mistakes (like counting the r's in "strawberry").</p>
+    </div>
+  </section>
+
+<footer>
+  <p><em>Found a mistake? Have a question? Put it in the comments. I read every one. If this helped you, share it with one person who's starting their GenAI journey.</em></p>
+  <p>Generative AI Engineer Series · Article #02 · Phase 1: Foundations</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var rail = document.getElementById('rail');
+  var btn = document.getElementById('railToggle');
+  if (btn && rail) {
+    btn.addEventListener('click', function(){
+      var open = rail.getAttribute('data-open') === 'true';
+      rail.setAttribute('data-open', open ? 'false' : 'true');
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      btn.textContent = open ? 'Show contents' : 'Hide contents';
+    });
+    rail.addEventListener('click', function(e){
+      if (e.target.closest('a') && window.innerWidth < 1080) {
+        rail.setAttribute('data-open', 'false');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.textContent = 'Show contents';
+      }
+    });
+  }
+  // theme switcher: auto -> light -> dark
+  var tb = document.getElementById('themeBtn');
+  var modes = ['auto', 'light', 'dark'], i = 0;
+  if (tb) tb.addEventListener('click', function(){
+    i = (i + 1) % 3;
+    if (modes[i] === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', modes[i]);
+    tb.textContent = 'Theme: ' + modes[i];
+  });
+  // highlight the current section in the rail
+  var links = {};
+  document.querySelectorAll('.rail a[href^="#s"]').forEach(function(a){ links[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting && links[en.target.id]) {
+          Object.values(links).forEach(function(a){ a.classList.remove('on'); });
+          links[en.target.id].classList.add('on');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('main section[id]').forEach(function(s){ io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>

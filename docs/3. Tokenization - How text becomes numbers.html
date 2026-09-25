@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tokenisation: How Text Becomes Numbers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F3F5F4;
+  --surface:#FFFFFF;
+  --surface-sunk:#E9EDEB;
+  --ink:#101C19;
+  --ink-soft:#33443F;
+  --muted:#5C6B66;
+  --rule:#D2DAD7;
+  --rule-strong:#B4C0BC;
+  --accent:#0E6E62;
+  --accent-bright:#2A9D8F;
+  --accent-wash:#E2EFEC;
+  --gain:#1B6B4C;
+  --gain-wash:#E3EFE8;
+  --loss:#B23A26;
+  --amber:#8A5E0F;
+  --amber-wash:#F6EEDC;
+  --loss-wash:#F8E8E4;
+  --c-kw:#0E6E62; --c-fn:#1F5B7A; --c-st:#8A5E0F; --c-cm:#7A8984; --c-nm:#B23A26; --c-out:#1B6B4C;
+
+  --display:"Newsreader",Georgia,"Times New Roman",serif;
+  --body:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --measure:91ch;
+  --wide:1080px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1412; --surface:#141D1A; --surface-sunk:#101816;
+    --ink:#E2E9E6; --ink-soft:#BAC7C2; --muted:#8A9B95;
+    --rule:#243330; --rule-strong:#354844;
+    --accent:#5AC9B6; --accent-bright:#6FD8C4; --accent-wash:#132824;
+    --gain:#54B98C; --gain-wash:#10231B; --loss:#E38270; --amber:#D9A94E; --amber-wash:#251E10; --loss-wash:#261715;
+    --c-kw:#5AC9B6; --c-fn:#7FB8D8; --c-st:#D9A94E; --c-cm:#7A8C86; --c-nm:#E38270; --c-out:#54B98C;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1412; --surface:#141D1A; --surface-sunk:#101816;
+  --ink:#E2E9E6; --ink-soft:#BAC7C2; --muted:#8A9B95;
+  --rule:#243330; --rule-strong:#354844;
+  --accent:#5AC9B6; --accent-bright:#6FD8C4; --accent-wash:#132824;
+  --gain:#54B98C; --gain-wash:#10231B; --loss:#E38270; --amber:#D9A94E; --amber-wash:#251E10; --loss-wash:#261715;
+  --c-kw:#5AC9B6; --c-fn:#7FB8D8; --c-st:#D9A94E; --c-cm:#7A8C86; --c-nm:#E38270; --c-out:#54B98C;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- shell ---------- */
+.shell{display:block}
+@media (min-width:1080px){
+  .shell{display:grid;grid-template-columns:248px minmax(0,1fr);align-items:start}
+}
+
+/* ---------- contents rail ---------- */
+.rail{border-bottom:1px solid var(--rule);background:var(--surface);padding:16px}
+.rail-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.rail nav{display:none}
+.rail[data-open="true"] nav{display:block;margin-top:12px}
+.rail-toggle{display:block;width:100%;text-align:left;background:none;border:1px solid var(--rule-strong);border-radius:2px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:8px 10px;cursor:pointer}
+.rail-toggle:hover{border-color:var(--accent)}
+@media (min-width:1080px){
+  .rail{position:sticky;top:0;height:100dvh;overflow-y:auto;border-bottom:none;border-right:1px solid var(--rule);padding:28px 20px 40px}
+  .rail nav{display:block}
+  .rail-toggle{display:none}
+}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.rail li{margin:0}
+.rail a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--ink-soft);font-size:13.5px;line-height:1.35;padding:5px 6px;border-radius:2px}
+.rail a:hover,.rail a.on{background:var(--accent-wash);color:var(--accent)}
+.rail a .n{font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:1.6em;font-variant-numeric:tabular-nums}
+.rail .sub a{font-size:12.5px;color:var(--muted)}
+.rail hr{border:0;border-top:1px solid var(--rule);margin:14px 0 10px}
+.theme-btn{margin-top:18px;background:none;border:1px solid var(--rule-strong);border-radius:2px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:6px 10px;cursor:pointer;width:100%;text-align:left}
+.theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- content ---------- */
+.content{padding-inline:clamp(16px,5vw,56px);padding-block:0 96px;min-width:0}
+.content > *{max-width:var(--measure);margin-inline:auto}
+.content > .wide{max-width:var(--wide)}
+section > *{max-width:100%}
+section{scroll-margin-top:12px}
+section + section{border-top:1px solid var(--rule);margin-top:64px}
+section > h2:first-child{margin-top:48px}
+#terms,#exercise,#next{scroll-margin-top:12px}
+
+/* ---------- masthead ---------- */
+.masthead{max-width:var(--wide);padding-block:clamp(40px,7vw,76px) 34px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:500;font-size:clamp(2.3rem,6.2vw,4rem);line-height:1.03;letter-spacing:-.022em;margin:0 0 20px;text-wrap:balance}
+.standfirst{font-family:var(--display);font-size:clamp(1.08rem,2.4vw,1.32rem);line-height:1.55;color:var(--ink-soft);max-width:60ch;margin:0}
+.byline{margin-top:24px;font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 18px}
+
+/* ---------- key figures strip ---------- */
+.figures{max-width:var(--wide);display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border-bottom:1px solid var(--rule);margin:0 auto 48px}
+.figures div{padding:18px 20px 20px;border-right:1px solid var(--rule)}
+.figures div:last-child{border-right:none}
+.figures dt{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.figures dd{margin:0;font-family:var(--display);font-size:1.75rem;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.01em}
+.figures dd small{display:block;font-family:var(--body);font-size:11.5px;color:var(--muted);margin-top:5px;letter-spacing:0;line-height:1.4}
+@media (max-width:620px){.figures div{border-right:none;border-bottom:1px solid var(--rule)}.figures div:last-child{border-bottom:none}}
+
+/* ---------- typography ---------- */
+h2{font-family:var(--display);font-weight:500;font-size:clamp(1.7rem,3.6vw,2.4rem);line-height:1.12;letter-spacing:-.018em;margin:72px 0 6px;text-wrap:balance}
+h2 .part{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;font-weight:500}
+h3{font-family:var(--display);font-weight:600;font-size:1.26rem;line-height:1.25;letter-spacing:-.008em;margin:40px 0 4px;text-wrap:balance}
+h4{font-family:var(--mono);font-weight:600;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:30px 0 4px}
+p{margin:14px 0}
+a{color:var(--accent)}
+strong{font-weight:600}
+em{font-style:italic}
+code{font-family:var(--mono);font-size:.86em;background:var(--surface-sunk);padding:1px 5px;border-radius:2px;border:1px solid var(--rule)}
+ul,ol{margin:14px 0;padding-left:1.25em}
+li{margin:7px 0}
+li::marker{color:var(--accent)}
+hr.sep{border:0;border-top:1px solid var(--rule);margin:56px auto;max-width:var(--measure)}
+.lede{font-size:1.06rem;color:var(--ink-soft)}
+
+/* ---------- callouts ---------- */
+.trap,.note,.aside,.yt{border-left:3px solid;padding:16px 18px;margin:26px 0;border-radius:0 2px 2px 0}
+.trap{border-color:var(--loss);background:var(--loss-wash)}
+.note{border-color:var(--amber);background:var(--amber-wash)}
+.aside{border-color:var(--accent);background:var(--accent-wash)}
+.yt{border-color:var(--rule-strong);background:var(--surface-sunk);font-size:14.5px;color:var(--ink-soft)}
+.label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:7px;font-weight:600}
+.trap .label{color:var(--loss)}
+.note .label{color:var(--amber)}
+.aside .label{color:var(--accent)}
+.yt .label{color:var(--muted)}
+.trap p:first-of-type,.note p:first-of-type,.aside p:first-of-type{margin-top:0}
+.trap p:last-child,.note p:last-child,.aside p:last-child{margin-bottom:0}
+blockquote.quote{margin:24px 0;padding:6px 0 6px 20px;border-left:2px solid var(--rule-strong);font-family:var(--display);font-style:italic;font-size:1.25rem;line-height:1.45;color:var(--ink-soft)}
+.big-idea{font-family:var(--display);font-size:1.4rem;line-height:1.35;letter-spacing:-.01em;color:var(--ink);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:18px 0;margin:30px 0;text-wrap:balance}
+.big-idea::before{content:"Key idea";display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+
+/* ---------- exhibits (figures stay on paper in both themes) ---------- */
+.exhibit{margin:34px auto;border:1px solid var(--rule);background:#FCFDFC;border-radius:2px;overflow:hidden}
+.exhibit .head{padding:11px 16px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:#5C6B66;background:#F1F4F3;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.exhibit .body{padding:20px 16px;overflow-x:auto;color:#101C19}
+.exhibit .body svg{display:block;width:100%;height:auto;max-width:100%}
+.exhibit figcaption{padding:12px 16px;border-top:1px solid var(--rule);font-size:13px;color:#4A5A55;background:#F1F4F3;line-height:1.5}
+.swipe{display:none}
+@media (max-width:620px){
+  .exhibit .body svg{min-width:600px}
+  .swipe{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:#5C6B66;padding:0 16px 10px;background:#FCFDFC}
+}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;margin:26px 0;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:440px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule-strong)}
+tbody tr:last-child td{border-bottom:none}
+td.k{font-weight:600}
+.terms td.k{white-space:nowrap}
+tr.hi td{background:var(--accent-wash)}
+
+/* ---------- code ---------- */
+.codewrap{margin:22px 0;border:1px solid var(--rule);border-radius:2px;overflow:hidden;background:var(--surface-sunk)}
+.codehead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);background:var(--surface)}
+.codewrap pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--ink);white-space:pre}
+.kw{color:var(--c-kw);font-weight:500}.fn{color:var(--c-fn)}.st{color:var(--c-st)}.cm{color:var(--c-cm);font-style:italic}.nm{color:var(--c-nm)}.out{color:var(--c-out)}.pmt{color:var(--muted);font-weight:600}.var{color:var(--ink)}.dec{color:var(--c-fn)}
+
+/* ---------- stat strip inside the article ---------- */
+.param-row{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:2px;background:var(--surface);margin:26px 0}
+.param-card{padding:16px 18px;border-right:1px solid var(--rule)}
+.param-card:last-child{border-right:none}
+.param-value{display:block;font-family:var(--display);font-size:1.7rem;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums}
+.param-label{display:block;font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+.param-label strong{color:var(--ink)}
+
+/* ---------- before / after and two-view cards ---------- */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 10px}
+.ba > div{border:1px solid var(--rule);background:var(--surface);padding:14px 16px;border-radius:2px;font-size:14.5px;line-height:1.55}
+.ba .before{border-top:2px solid var(--loss)}
+.ba .after{border-top:2px solid var(--gain)}
+.ba .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:6px;font-weight:600}
+.ba .before .tag{color:var(--loss)}
+.ba .after .tag{color:var(--gain)}
+.other-uses{font-size:14px;color:var(--muted);margin-top:6px}
+
+/* ---------- roadmap ---------- */
+.roadmap{margin:26px 0;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+.phase{display:grid;grid-template-columns:132px 1fr;border-bottom:1px solid var(--rule)}
+.phase:last-child{border-bottom:none}
+.phase-tag{padding:14px 16px;font-family:var(--mono);border-right:1px solid var(--rule)}
+.phase-tag b{display:block;font-size:11px;letter-spacing:.12em;color:var(--accent);font-weight:600}
+.phase-tag span{display:block;font-size:10.5px;color:var(--muted);margin-top:3px}
+.phase-body{padding:13px 16px;font-size:14px;line-height:1.55;color:var(--ink-soft)}
+.phase-body strong{display:block;font-family:var(--display);font-size:1.08rem;font-weight:600;color:var(--ink);margin-bottom:3px}
+.phase.current{background:var(--accent-wash);box-shadow:inset 3px 0 0 var(--accent)}
+.here{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent);padding:1px 6px;border-radius:2px;margin-left:8px;vertical-align:3px;font-weight:600}
+
+/* ---------- boxes ---------- */
+.pathbox{border:1px solid var(--rule-strong);background:var(--surface);padding:18px 20px;margin:28px 0;border-radius:2px}
+.pathbox h4{margin-top:0}
+.pathbox ol,.pathbox ul{margin-bottom:0}
+.summary{border-top:2px solid var(--accent)}
+.summary li{font-size:15px}
+.decision{border:1px solid var(--rule);border-top:2px solid var(--accent);background:var(--surface);padding:18px 20px;margin:26px 0;border-radius:0 0 2px 2px}
+.decision .id{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--accent);font-weight:600;text-transform:uppercase}
+.decision h5{font-family:var(--display);font-size:1.35rem;font-weight:600;margin:5px 0 10px;line-height:1.25}
+.decision p{margin:8px 0;color:var(--ink-soft)}
+
+footer{max-width:var(--wide);margin:80px auto 0;padding-top:24px;border-top:2px solid var(--ink);font-size:13px;color:var(--muted)}
+footer a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:620px){
+  .param-row,.ba{grid-template-columns:1fr}
+  .param-card{border-right:none;border-bottom:1px solid var(--rule)}
+  .param-card:last-child{border-bottom:none}
+  .phase{grid-template-columns:1fr}
+  .phase-tag{border-right:none;border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:baseline;padding:10px 16px}
+  .phase-tag span{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="rail" id="rail">
+  <p class="rail-title">Contents</p>
+  <button class="rail-toggle" id="railToggle" aria-expanded="false" aria-controls="railNav">Show contents</button>
+  <nav id="railNav">
+    <ol>
+      <li><a href="#s1"><span class="n">01</span><span>Why tokenisation matters</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>What is a token?</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Byte Pair Encoding</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>WordPiece and SentencePiece</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Hands-on: tiktoken</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Hands-on: Hugging Face</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>What this means for engineers</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Build BPE from scratch</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Summary</span></a></li>
+    </ol>
+    <hr>
+    <ol class="sub">
+      <li><a href="#prev"><span class="n">←</span><span>Previously: Article #02</span></a></li>
+      <li><a href="#exercise"><span class="n">§</span><span>Learner exercise</span></a></li>
+      <li><a href="#next"><span class="n">→</span><span>Next: Article #04</span></a></li>
+    </ol>
+    <button class="theme-btn" id="themeBtn" type="button">Theme: auto</button>
+  </nav>
+</aside>
+
+<main class="content">
+
+<header class="masthead">
+  <p class="eyebrow">Generative AI Engineer Series · Article 03 · Phase 1: Foundations</p>
+  <h1>Tokenisation: How Text Becomes&nbsp;Numbers</h1>
+  <p class="standfirst">The invisible first step in every LLM pipeline. What a token really is, how a tokeniser learns its vocabulary, and why tokens shape your API bill, your context window, and even whether a model can count the r's in "strawberry".</p>
+  <p class="byline">
+    <span>~25 min read</span>
+    <span>5 figures</span>
+    <span>First hands-on coding article</span>
+    <span>Prerequisites: Articles #01 and #02</span>
+  </p>
+</header>
+
+<dl class="figures">
+  <div><dt>Rule of thumb</dt><dd>1 ≈ 4<small>one English token is about four characters, or ¾ of a word</small></dd></div>
+  <div><dt>Vocabulary sizes</dt><dd>100k → 200k<small>cl100k_base (original GPT-4) to o200k_base (GPT-4o)</small></dd></div>
+  <div><dt>Same sentence in Hindi</dt><dd>4.5× → 1.3×<small>tokens needed vs English, older vs newer encoding</small></dd></div>
+  <div><dt>"strawberry"</dt><dd>3 tokens<small>str · aw · berry, which is why counting r's is hard</small></dd></div>
+</dl>
+
+  <section id="s1">
+    <h2><span class="part">§ 01 · Hook</span>Why Tokenisation Matters</h2>
+
+    <div class="aside" id="prev">
+      <span class="label">Where we left off</span>
+      <p>In <strong>Article #02</strong>, Figure 2 showed text turning into token IDs, then into embedding vectors, then getting a position stamp before the first Transformer layer. We skipped quickly over that very first arrow, "tokenise". This article is entirely about it.</p>
+    </div>
+
+    <p>Open a Python terminal and run this:</p>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>run this first</span></div><pre><span class="kw">import</span> tiktoken
+enc = tiktoken.<span class="fn">get_encoding</span>(<span class="st">"cl100k_base"</span>)
+enc.<span class="fn">encode</span>(<span class="st">"ChatGPT is great!"</span>)
+<span class="out"># → [16047, 38, 2898, 374, 2294, 0]</span></pre></div>
+
+    <p>Six numbers. That's what a GPT model using the <code>cl100k_base</code> encoding actually receives when you type "ChatGPT is great!". It doesn't see text or letters, just a sequence of integers. And notice that there are six of them for three words and an exclamation mark. Decode them one at a time and you get <code>'Chat'</code>, <code>'G'</code>, <code>'PT'</code>, <code>' is'</code>, <code>' great'</code>, <code>'!'</code>. The name "ChatGPT" takes three tokens, because this encoding's vocabulary was built before the word became common. Now try this:</p>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>two more</span></div><pre>enc.<span class="fn">encode</span>(<span class="st">"strawberry"</span>)
+<span class="out"># → [496, 675, 15717]    three tokens: "str", "aw", "berry"</span>
+
+enc.<span class="fn">encode</span>(<span class="st">" strawberry"</span>)
+<span class="out"># → [73700]              one token, once there's a space in front</span></pre></div>
+
+    <p>Why is "strawberry" three tokens on its own but one token after a space? Why does every LLM API charge by the token? And why did models like GPT-4 famously struggle to count the r's in "strawberry"?</p>
+
+    <p>All of these have the same answer: <strong>tokenisation</strong>. It's the invisible first step in every LLM pipeline, it's rarely explained well, and it has real consequences for how you build GenAI systems. Get it right and you'll understand why models behave the way they do, how to manage your <strong>context window</strong> (Article #01, §06: the maximum number of tokens a model can consider in one request, counting your prompt <em>and</em> its reply), how to forecast API costs, and how to spot failure modes before they bite you in production.</p>
+
+    <div class="note">
+      <span class="label">A caveat before we go further</span>
+      <p>This is a hands-on article, so it's full of specific numbers: encoding names, vocabulary sizes, prices, context limits. These are among the fastest-moving facts in the field. Every token ID and count here was measured with tiktoken's <code>cl100k_base</code> and <code>o200k_base</code> encodings, but when you build something, check the current values for the model you're actually calling (<code>tiktoken.encoding_for_model("your-model-name")</code> gets you the right encoding for OpenAI models). The workflow itself, encode, count, estimate, budget, doesn't change.</p>
+    </div>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Open by typing a sentence into OpenAI's tokeniser playground (platform.openai.com/tokenizer) and showing the coloured token breakdown live. Say: "Every token costs money. Every token uses context window. Understanding this makes you a better GenAI engineer."
+    </div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="part">§ 02 · The Concept</span>What Is a Token?</h2>
+
+    <p>A token is the basic unit of text an LLM reads and writes. It's <em>not</em> a word, and it's <em>not</em> a character. It sits in between: a <strong>subword</strong> unit that balances the size of the vocabulary against the length of the sequence.</p>
+
+    <p>Some rules of thumb for English text:</p>
+    <ul>
+      <li>1 token ≈ 4 characters</li>
+      <li>1 token ≈ ¾ of a word, so 100 tokens ≈ 75 words</li>
+      <li>The <code>cl100k_base</code> encoding used in most of this article (the one behind the original GPT-4 and GPT-3.5-turbo) has a vocabulary of about 100,000 tokens. OpenAI's newer models, from GPT-4o onward, use <code>o200k_base</code>, with about 200,000. The ideas below apply to both; only the exact numbers shift.</li>
+    </ul>
+
+    <p>Everything you send to an LLM becomes a sequence of integer IDs from that fixed vocabulary. Every word, punctuation mark, number, emoji, and code symbol is represented as some combination of vocabulary items.</p>
+
+    <h3>Why not just use words?</h3>
+
+    <p>It's the natural question, but a word-level vocabulary runs into two serious problems. First, the vocabulary explodes. Large English dictionaries list hundreds of thousands of words, and that's before names, technical jargon, typos, slang, and every other language. Second, there's no good way to handle a word the model has never seen. "ChatGPT" didn't exist in any dictionary before late 2022. A word-level model would have to replace it with a generic <code>[UNKNOWN]</code> marker and lose everything about it.</p>
+
+    <h3>Why not just use characters?</h3>
+
+    <p>Characters fix the vocabulary problem; a byte-level vocabulary needs only 256 symbols to represent any text at all. But they create a different problem: sequences get very long. "Hello world" is 11 characters but only two tokens.</p>
+
+    <p>That's worse than it sounds. Recall from Article #02 that attention lets every token look at every other token. The number of those token-to-token comparisons grows with the <em>square</em> of the sequence length. A sequence 4–5× longer doesn't cost 4–5× more attention work; it costs 16–25× more. On top of that, the model would have to learn words, syllables, and <strong>morphemes</strong> (the smallest meaningful chunks of a word, like the "-ing" in "running" or the "un-" in "unhappy") from raw letters, a much harder learning problem.</p>
+
+    <h3>Subword tokenisation is the sweet spot</h3>
+
+    <p>Common words become a single token. Rare or long words get split into recognisable pieces. The model sees enough regularity to learn patterns efficiently, and the vocabulary stays a manageable size.</p>
+
+    <p>Think of LEGO. A fixed kit of standard bricks can build almost anything, including things nobody has built before. You don't need a custom-moulded piece for every object in existence (the word-level problem), and you don't have to build everything from raw plastic pellets (the character-level problem). Subword tokens are that kit for language.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 1</span><span>Three ways to split the same sentence</span></div><div class="body"><svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><text x="350" y="20" text-anchor="middle" font-size="13" font-style="italic" fill="#33443F">"Tokenisation is fascinating"</text><text x="16" y="60" font-size="12.5" font-weight="700" fill="#B23A26">Character-level</text><text x="16" y="77" font-size="11" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">27 units</text><text x="16" y="94" font-size="10" fill="#5C6B66"><tspan x="16">tiny vocabulary,</tspan><tspan x="16" dy="13">very long</tspan></text><rect x="160" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="168.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">T</text><rect x="179" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="187.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">o</text><rect x="198" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="206.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">k</text><rect x="217" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="225.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="236" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="244.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="255" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="263.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="274" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="282.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">s</text><rect x="293" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="301.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">a</text><rect x="312" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="320.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">t</text><rect x="331" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="339.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="350" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="358.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">o</text><rect x="369" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="377.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="388" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="396.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">␣</text><rect x="407" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="415.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="426" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="434.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">s</text><rect x="445" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="453.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">␣</text><rect x="464" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="472.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">f</text><rect x="483" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="491.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">a</text><rect x="502" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="510.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">s</text><rect x="521" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="529.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">c</text><rect x="540" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="548.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="559" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="567.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="578" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="586.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">a</text><rect x="597" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="605.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">t</text><rect x="616" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="624.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="635" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="643.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="654" y="48" width="17" height="26" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="662.5" y="65.0" text-anchor="middle" font-size="10" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">g</text><text x="16" y="152" font-size="12.5" font-weight="700" fill="#8A5E0F">Word-level</text><text x="16" y="169" font-size="11" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">3 units</text><text x="16" y="186" font-size="10" fill="#5C6B66"><tspan x="16">short,</tspan><tspan x="16" dy="13">rare words go missing</tspan></text><rect x="160" y="140" width="170" height="28" rx="3" fill="#F8E8E4" stroke="#B23A26" stroke-width="1.3"/><text x="245.0" y="158.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#B23A26" style="font-family:'IBM Plex Mono',monospace">[UNKNOWN]</text><rect x="336" y="140" width="50" height="28" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="361.0" y="158.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">is</text><rect x="392" y="140" width="110" height="28" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="447.0" y="158.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">fascinating</text><text x="160" y="186" font-size="10" fill="#B23A26">"Tokenisation" (British spelling) is not in the word list, so its meaning is lost</text><text x="16" y="244" font-size="12.5" font-weight="700" fill="#1B6B4C">Subword (BPE)</text><text x="16" y="261" font-size="11" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">4 tokens</text><text x="16" y="278" font-size="10" fill="#5C6B66"><tspan x="16">short,</tspan><tspan x="16" dy="13">nothing unknown</tspan></text><rect x="160" y="232" width="70" height="28" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="195.0" y="250.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">Token</text><rect x="236" y="232" width="84" height="28" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="278.0" y="250.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">isation</text><rect x="326" y="232" width="50" height="28" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="351.0" y="250.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">␣is</text><rect x="382" y="232" width="128" height="28" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="446.0" y="250.0" text-anchor="middle" font-size="11.5" font-weight="500" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">␣fascinating</text><text x="160" y="278" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">3404 · 8082 · 374 · 27387   (cl100k_base IDs)</text><text x="350" y="318" text-anchor="middle" font-size="10.5" fill="#5C6B66">␣ marks a space. In GPT-style tokenisers the space is glued onto the front of the next word.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Character-level needs 27 units and knows nothing about words. Word-level is compact but loses any word outside its list. Subword BPE uses 4 tokens, never hits an unknown word, and keeps the word's structure visible.</figcaption></figure>
+  </section>
+
+  <section id="s3">
+    <h2><span class="part">§ 03 · The Algorithm</span>Byte Pair Encoding: How GPT Tokenises</h2>
+
+    <p><strong>Byte Pair Encoding (BPE)</strong> is the algorithm behind the GPT family, from GPT-2 through GPT-4o, and behind the Llama models. It's the dominant approach, so it's worth understanding properly.</p>
+
+    <p>The most important thing to know up front: <strong>BPE isn't a set of rules someone wrote.</strong> Its vocabulary is <em>learned</em> by scanning a huge amount of text and discovering which chunks naturally recur.</p>
+
+    <h3>The intuition: merge what appears together</h3>
+
+    <p>Start with the smallest possible units, individual characters. Ask: "Which two neighbouring units appear together most often across all my text?" Merge that pair into one new unit. Repeat. After enough merges, common words become single units, common endings like <code>-ing</code>, <code>-tion</code>, and <code>-est</code> become their own tokens, and rare words stay as several pieces.</p>
+
+    <h3>Step by step on a toy corpus</h3>
+
+    <p>Real tokenisers count how often each word appears, so our toy corpus has counts too: "low" appears 5 times, "lower" 2 times, "newest" 6 times, and "widest" 3 times. (This is the classic example from the 2016 paper that first brought BPE to neural machine translation.) Each word starts as separate characters plus an end-of-word marker, <code>&lt;/w&gt;</code>.</p>
+
+    <p>That marker matters more than it looks. It acts as a fence at the end of each word, so a merge can never join the last letter of one word to the first letter of the next. GPT-style tokenisers do the same job differently: instead of an end marker, they glue the space onto the <em>front</em> of the following word, which is why you'll see tokens like <code>' is'</code> in §05.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Merge</th><th>Most frequent pair</th><th>Seen</th><th>New unit</th></tr></thead>
+        <tbody>
+          <tr><td class="k">1</td><td><code>e</code> + <code>s</code></td><td>9×</td><td><code>es</code> (in newest ×6 and widest ×3)</td></tr>
+          <tr><td class="k">2</td><td><code>es</code> + <code>t</code></td><td>9×</td><td><code>est</code></td></tr>
+          <tr><td class="k">3</td><td><code>est</code> + <code>&lt;/w&gt;</code></td><td>9×</td><td><code>est&lt;/w&gt;</code>, the ending "-est"</td></tr>
+          <tr><td class="k">4</td><td><code>l</code> + <code>o</code></td><td>7×</td><td><code>lo</code></td></tr>
+          <tr><td class="k">5</td><td><code>lo</code> + <code>w</code></td><td>7×</td><td><code>low</code></td></tr>
+          <tr><td class="k">6</td><td><code>n</code> + <code>e</code></td><td>6×</td><td><code>ne</code></td></tr>
+          <tr><td class="k">7</td><td><code>ne</code> + <code>w</code></td><td>6×</td><td><code>new</code></td></tr>
+          <tr><td class="k">8</td><td><code>new</code> + <code>est&lt;/w&gt;</code></td><td>6×</td><td><code>newest&lt;/w&gt;</code>, a whole word</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="exhibit"><div class="head"><span>Figure 2</span><span>How BPE carves up the corpus, merge by merge</span></div><div class="body"><svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><text x="18" y="22" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">CORPUS: low ×5 · lower ×2 · newest ×6 · widest ×3</text><text x="14" y="50" font-size="12.5" font-weight="700" fill="#101C19">Start</text><text x="14" y="66" font-size="10" fill="#5C6B66">characters + end marker</text><rect x="14" y="82" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="21.6" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">l</text><rect x="32.2" y="82" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="39.800000000000004" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">o</text><rect x="50.400000000000006" y="82" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="58.00000000000001" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="68.60000000000001" y="82" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="87.0" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><text x="112.4" y="98" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">×5</text><rect x="14" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="21.6" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">l</text><rect x="32.2" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="39.800000000000004" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">o</text><rect x="50.400000000000006" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="58.00000000000001" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="68.60000000000001" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="76.2" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="86.80000000000001" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="94.4" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="105.00000000000001" y="144" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="123.4" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><text x="148.8" y="160" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">×2</text><rect x="14" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="21.6" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="32.2" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="39.800000000000004" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="50.400000000000006" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="58.00000000000001" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="68.60000000000001" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="76.2" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="86.80000000000001" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="94.4" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">s</text><rect x="105.00000000000001" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="112.60000000000001" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">t</text><rect x="123.20000000000002" y="206" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="141.60000000000002" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><text x="167.0" y="222" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">×6</text><rect x="14" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="21.6" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="32.2" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="39.800000000000004" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="50.400000000000006" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="58.00000000000001" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">d</text><rect x="68.60000000000001" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="76.2" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="86.80000000000001" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="94.4" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">s</text><rect x="105.00000000000001" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="112.60000000000001" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">t</text><rect x="123.20000000000002" y="268" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="141.60000000000002" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><text x="167.0" y="284" font-size="9.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">×3</text><text x="186" y="50" font-size="12.5" font-weight="700" fill="#0E6E62">After merge 3</text><text x="186" y="66" font-size="10" fill="#5C6B66">es → est → est</w></text><rect x="186" y="82" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="193.6" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">l</text><rect x="204.2" y="82" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="211.79999999999998" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">o</text><rect x="222.39999999999998" y="82" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="229.99999999999997" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="240.59999999999997" y="82" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="258.99999999999994" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><rect x="186" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="193.6" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">l</text><rect x="204.2" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="211.79999999999998" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">o</text><rect x="222.39999999999998" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="229.99999999999997" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="240.59999999999997" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="248.19999999999996" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="258.79999999999995" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="266.4" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="276.99999999999994" y="144" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="295.3999999999999" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><rect x="186" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="193.6" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="204.2" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="211.79999999999998" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="222.39999999999998" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="229.99999999999997" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="240.59999999999997" y="206" width="58.4" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="269.79999999999995" y="222.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">est·</text><rect x="186" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="193.6" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="204.2" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="211.79999999999998" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="222.39999999999998" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="229.99999999999997" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">d</text><rect x="240.59999999999997" y="268" width="58.4" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="269.79999999999995" y="284.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">est·</text><text x="358" y="50" font-size="12.5" font-weight="700" fill="#0E6E62">After merge 5</text><text x="358" y="66" font-size="10" fill="#5C6B66">lo → low</text><rect x="358" y="82" width="29.6" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="372.8" y="98.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">low</text><rect x="390.6" y="82" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="409.0" y="98.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><rect x="358" y="144" width="29.6" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="372.8" y="160.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">low</text><rect x="390.6" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="398.20000000000005" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="408.8" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="416.40000000000003" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="427.0" y="144" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="445.4" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><rect x="358" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="365.6" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">n</text><rect x="376.2" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="383.8" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="394.4" y="206" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="402.0" y="222.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="412.59999999999997" y="206" width="58.4" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="441.79999999999995" y="222.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">est·</text><rect x="358" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="365.6" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="376.2" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="383.8" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="394.4" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="402.0" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">d</text><rect x="412.59999999999997" y="268" width="58.4" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="441.79999999999995" y="284.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">est·</text><text x="530" y="50" font-size="12.5" font-weight="700" fill="#0E6E62">After merge 9</text><text x="530" y="66" font-size="10" fill="#5C6B66">new, newest</w>, low</w></text><rect x="530" y="82" width="58.4" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="559.2" y="98.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">low·</text><rect x="530" y="144" width="29.6" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="544.8" y="160.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">low</text><rect x="562.6" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="570.2" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="580.8000000000001" y="144" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="588.4000000000001" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="599.0000000000001" y="144" width="36.8" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="617.4000000000001" y="160.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">·</text><rect x="530" y="206" width="80.0" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="570.0" y="222.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">newest·</text><rect x="530" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="537.6" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="548.2" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="555.8000000000001" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">i</text><rect x="566.4000000000001" y="268" width="15.2" height="24" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="574.0000000000001" y="284.0" text-anchor="middle" font-size="10.5" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">d</text><rect x="584.6000000000001" y="268" width="58.4" height="24" rx="3" fill="#E2EFEC" stroke="#0E6E62" stroke-width="1.3"/><text x="613.8000000000002" y="284.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">est·</text><text x="350" y="340" text-anchor="middle" font-size="10.5" fill="#5C6B66">· is the end-of-word marker &lt;/w&gt;. Shaded chips are units the algorithm invented. Nobody told it about "-est".</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>These snapshots come from actually running the code in §08. The most frequent word, "newest", becomes a single unit by merge 8, while the rare "lower" is still in pieces.</figcaption></figure>
+
+    <p>After just eight merges on a tiny corpus, the ending "-est", the base "low", and the whole word "newest" have all become single units. On real data, with tens of thousands of merges, the same loop produces an entire vocabulary of useful pieces.</p>
+
+    <div class="aside">
+      <span class="label">Key insight</span>
+      <p>The ending <code>-est</code> emerged from the data. Nobody told the algorithm that English has superlatives. Patterns that are common in the training text naturally compress into single tokens, so the vocabulary mirrors the statistics of the language it was trained on.</p>
+    </div>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Do this derivation live, slowly. Say: "This simple loop, count the pairs, merge the most common one, repeat, is how GPT's tokeniser learned that '-ing' and '-tion' deserve their own tokens."
+    </div>
+
+    <h3>Why this matters in practice</h3>
+    <ul>
+      <li><strong>Common English words are one token:</strong> <code>the</code>, <code>and</code>, <code>is</code>, <code>Python</code>, <code>function</code> (all confirmed with cl100k_base).</li>
+      <li><strong>Less common words take two to four:</strong> <code>tokenisation</code> → <code>token</code> + <code>isation</code>.</li>
+      <li><strong>Many non-English scripts take more tokens</strong> for the same meaning, because the training text was mostly English (§07 has the measurements).</li>
+      <li><strong>Random strings, IDs, and hashes are expensive:</strong> often close to one token per character.</li>
+    </ul>
+  </section>
+
+  <section id="s4">
+    <h2><span class="part">§ 04 · Other Algorithms</span>WordPiece and SentencePiece</h2>
+
+    <p>BPE isn't the only approach. When you use models from Hugging Face, you'll meet two others, and it's worth knowing enough not to be surprised.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Byte-level BPE</th><th>WordPiece</th><th>SentencePiece</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Used by</td><td>GPT-2 to GPT-4o, Llama 3, RoBERTa</td><td>BERT, DistilBERT, ELECTRA</td><td>T5, Llama 1 and 2, Gemma, early Mistral</td></tr>
+          <tr><td class="k">How it merges</td><td>Most frequent pair</td><td>Pair that most improves the likelihood of the training text</td><td>A toolkit: runs either BPE or a "unigram" model</td></tr>
+          <tr><td class="k">How pieces look</td><td>Space glued to the next word: <code>' is'</code></td><td><code>##</code> marks a continuation: <code>play</code> + <code>##ing</code></td><td><code>▁</code> marks a space: <code>▁Hello</code> <code>▁world</code></td></tr>
+          <tr><td class="k">Raw text</td><td>Works on bytes, so nothing is ever unknown</td><td>Splits on spaces first</td><td>Works on raw text directly, with no space-splitting step</td></tr>
+          <tr><td class="k">Multilingual</td><td>Depends on the training mix (see §07)</td><td>Awkward for scripts without spaces</td><td>Designed to be language-agnostic, including Chinese and Japanese</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="aside">
+      <span class="label">Practical takeaway</span>
+      <p><code>AutoTokenizer.from_pretrained("model-name")</code> in Hugging Face loads the right tokeniser for each model automatically, so you never have to choose. But you do need to know they differ, because the same sentence produces different token counts under each one, and therefore different context usage and costs.</p>
+    </div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="part">§ 05 · Hands-on Code</span>Exploring Tokenisation with tiktoken</h2>
+
+    <p>This is the first proper coding section of the series. Install <code>tiktoken</code>, open a Jupyter notebook, and run every cell below. Don't just read the outputs; change the inputs and watch what happens. Every output shown here was produced by running this exact code.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Bash</span><span>setup</span></div><pre><span class="pmt">$</span> pip install tiktoken</pre></div>
+
+    <h3>The basics: encode, count, decode</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 1 · fundamentals</span></div><pre><span class="kw">import</span> tiktoken
+
+<span class="cm"># The encoding behind the original GPT-4 and GPT-3.5-turbo (~100k tokens)</span>
+enc = tiktoken.<span class="fn">get_encoding</span>(<span class="st">"cl100k_base"</span>)
+
+text = <span class="st">"Tokenisation is the first step in every LLM pipeline."</span>
+tokens = enc.<span class="fn">encode</span>(text)
+
+<span class="fn">print</span>(tokens)
+<span class="out"># [3404, 8082, 374, 279, 1176, 3094, 304, 1475, 445, 11237, 15660, 13]</span>
+
+<span class="fn">print</span>(<span class="fn">len</span>(tokens))
+<span class="out"># 12</span>
+
+<span class="cm"># Decoding always gives you the original text back</span>
+<span class="fn">print</span>(enc.<span class="fn">decode</span>(tokens))
+<span class="out"># Tokenisation is the first step in every LLM pipeline.</span></pre></div>
+
+    <h3>Token-by-token inspection</h3>
+
+    <p>This is the most useful thing you can do: look at what each integer actually stands for.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 2 · see each token</span></div><pre><span class="kw">for</span> token_id <span class="kw">in</span> enc.<span class="fn">encode</span>(<span class="st">"Tokenisation is the first step"</span>):
+    <span class="fn">print</span>(<span class="st">f"{token_id:6d}  →  {repr(enc.decode([token_id]))}"</span>)
+
+<span class="out">#   3404  →  'Token'
+#   8082  →  'isation'
+#    374  →  ' is'       ← the space is part of the token
+#    279  →  ' the'
+#   1176  →  ' first'
+#   3094  →  ' step'</span></pre></div>
+
+    <p>Two things stand out. First, "Tokenisation" splits into <code>'Token'</code> and <code>'isation'</code>. Second, token 374 is <code>' is'</code>, with the space built in, not just <code>'is'</code>. Think of a rubber stamp that has a blank margin carved into its left edge. The tokeniser learned that "a space followed by a word" appears so often that it's cheaper to treat the pair as one unit than to spend a separate token on every space. (If you print all 12 tokens from experiment 1, you'll also see "LLM" split into <code>' L'</code> and <code>'LM'</code>.)</p>
+
+    <p>This matters when you assemble prompts: <code>"is"</code> and <code>" is"</code> are different tokens with different IDs, so the way you join strings together can quietly change your token count.</p>
+
+    <h3>The strawberry problem, live</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 3 · strawberry</span></div><pre><span class="fn">print</span>(enc.<span class="fn">encode</span>(<span class="st">"strawberry"</span>))
+<span class="out"># [496, 675, 15717]     "str" + "aw" + "berry"</span>
+
+<span class="fn">print</span>(enc.<span class="fn">encode</span>(<span class="st">" strawberry"</span>))
+<span class="out"># [73700]               the whole word, one ID</span></pre></div>
+
+    <figure class="exhibit"><div class="head"><span>Figure 3</span><span>The strawberry problem</span></div><div class="body"><svg viewBox="0 0 700 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><text x="170" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#101C19">What you see</text><rect x="20" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="34.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">s</text><rect x="50" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="64.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">t</text><rect x="80" y="36" width="28" height="34" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.3"/><text x="94.0" y="57.0" text-anchor="middle" font-size="14" font-weight="700" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="110" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="124.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">a</text><rect x="140" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="154.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">w</text><rect x="170" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="184.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">b</text><rect x="200" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="214.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">e</text><rect x="230" y="36" width="28" height="34" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.3"/><text x="244.0" y="57.0" text-anchor="middle" font-size="14" font-weight="700" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="260" y="36" width="28" height="34" rx="3" fill="#F6EEDC" stroke="#8A5E0F" stroke-width="1.3"/><text x="274.0" y="57.0" text-anchor="middle" font-size="14" font-weight="700" fill="#8A5E0F" style="font-family:'IBM Plex Mono',monospace">r</text><rect x="290" y="36" width="28" height="34" rx="3" fill="#FCFDFC" stroke="#B4C0BC" stroke-width="1.3"/><text x="304.0" y="57.0" text-anchor="middle" font-size="14" font-weight="400" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">y</text><text x="170" y="92" text-anchor="middle" font-size="11" fill="#8A5E0F" font-weight="600">three r's, easy to count</text><text x="530" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#101C19">What the model sees</text><rect x="380" y="36" width="86" height="34" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="423.0" y="57.0" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" style="font-family:'IBM Plex Mono',monospace">496</text><text x="423.0" y="88" text-anchor="middle" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">"str"</text><rect x="474" y="36" width="60" height="34" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="504.0" y="57.0" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" style="font-family:'IBM Plex Mono',monospace">675</text><text x="504.0" y="88" text-anchor="middle" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">"aw"</text><rect x="542" y="36" width="138" height="34" rx="3" fill="#0E6E62" stroke="#0E6E62" stroke-width="1.3"/><text x="611.0" y="57.0" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" style="font-family:'IBM Plex Mono',monospace">15717</text><text x="611.0" y="88" text-anchor="middle" font-size="10.5" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">"berry"</text><text x="530" y="112" text-anchor="middle" font-size="11" fill="#33443F">three opaque IDs; the letters are not visible</text><line x1="20" y1="132" x2="680" y2="132" stroke="#D2DAD7"/><text x="20" y="160" font-size="12" font-weight="700" fill="#101C19">To count the r's, the model would have to know from training that</text><text x="40" y="188" font-size="11.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">token 496 ("str")</text><text x="260" y="188" font-size="11.5" fill="#8A5E0F" font-weight="600">contains 1 r</text><text x="40" y="210" font-size="11.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">token 675 ("aw")</text><text x="260" y="210" font-size="11.5" fill="#5C6B66" font-weight="600">contains 0 r</text><text x="40" y="232" font-size="11.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">token 15717 ("berry")</text><text x="260" y="232" font-size="11.5" fill="#8A5E0F" font-weight="600">contains 2 r's</text><text x="40" y="258" font-size="11.5" fill="#33443F">and then add them up. It was never trained to do that directly.</text><rect x="440" y="150" width="240" height="110" rx="3" fill="#E2EFEC" stroke="#0E6E62"/><text x="452" y="172" font-size="11" font-weight="700" fill="#0E6E62">A twist worth knowing</text><text x="452" y="194" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">"strawberry"  → 3 tokens</text><text x="452" y="214" font-size="10.5" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">" strawberry" → 1 token (73700)</text><text x="452" y="238" font-size="10" fill="#33443F">Mid-sentence, the whole word is</text><text x="452" y="252" font-size="10" fill="#33443F">one ID: even fewer letters visible.</text><text x="350" y="300" text-anchor="middle" font-size="10.5" fill="#5C6B66">IDs measured with tiktoken's cl100k_base encoding (the original GPT-4 and GPT-3.5-turbo tokeniser).</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>The model never sees s-t-r-a-w-b-e-r-r-y. It sees IDs, and in the middle of a sentence it may see just one. Counting letters means knowing what is spelled inside each ID, which it was never directly trained to do.</figcaption></figure>
+
+    <p>The model never sees the individual letters. To count the r's, it has to recall what's spelled inside each token and add up the results, and nothing in next-token training teaches that directly. Newer models do much better at this, largely by spelling the word out step by step first (chain-of-thought, Article #01 §16), but the underlying limitation comes from tokenisation itself.</p>
+
+    <h3>Three more instructive experiments</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 4 · language efficiency</span></div><pre>o200k = tiktoken.<span class="fn">get_encoding</span>(<span class="st">"o200k_base"</span>)   <span class="cm"># the GPT-4o encoding (~200k tokens)</span>
+
+<span class="kw">for</span> label, text <span class="kw">in</span> [(<span class="st">"English"</span>, <span class="st">"Hello, how are you?"</span>), (<span class="st">"Hindi"</span>, <span class="st">"नमस्ते, आप कैसे हैं?"</span>)]:
+    <span class="fn">print</span>(<span class="st">f"{label:8s} cl100k: {len(enc.encode(text)):2d}   o200k: {len(o200k.encode(text)):2d}"</span>)
+
+<span class="out"># English  cl100k:  6   o200k:  6
+# Hindi    cl100k: 20   o200k:  9</span>
+
+<span class="cm"># The older encoding needs 3.3x more tokens for the Hindi greeting.</span>
+<span class="cm"># The newer one narrows that to 1.5x. This affects cost AND context usage.</span></pre></div>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 5 · a leading space changes the ID</span></div><pre><span class="fn">print</span>(enc.<span class="fn">encode</span>(<span class="st">"token"</span>))    <span class="out"># [5963]</span>
+<span class="fn">print</span>(enc.<span class="fn">encode</span>(<span class="st">" token"</span>))   <span class="out"># [4037]   a different ID!</span>
+
+<span class="cm"># "Please summarise:" and " Please summarise:" are different token sequences.</span></pre></div>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 6 · code vs prose vs random strings</span></div><pre>code      = <span class="st">"x = [i**2 for i in range(10)]"</span>
+prose     = <span class="st">"x equals the list of i squared for i in range ten"</span>
+random_id = <span class="st">"a7f3-4b2c-9d8e-1f0a-3c7b"</span>
+
+<span class="kw">for</span> label, text <span class="kw">in</span> [(<span class="st">"code"</span>, code), (<span class="st">"prose"</span>, prose), (<span class="st">"random"</span>, random_id)]:
+    n = <span class="fn">len</span>(enc.<span class="fn">encode</span>(text))
+    <span class="fn">print</span>(<span class="st">f"{label:6s}: {n:2d} tokens for {len(text):2d} chars  ({len(text)/n:.1f} chars/token)"</span>)
+
+<span class="out"># code  : 13 tokens for 29 chars  (2.2 chars/token)
+# prose : 12 tokens for 49 chars  (4.1 chars/token)
+# random: 24 tokens for 24 chars  (1.0 chars/token)</span>
+
+<span class="cm"># Plain English packs the most characters into each token.</span>
+<span class="cm"># A random ID costs one token per character: the worst case.</span></pre></div>
+
+    <h3>Cost estimation: a production skill</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>experiment 7 · estimate cost before you send</span></div><pre><span class="kw">def</span> <span class="fn">estimate_cost</span>(text: <span class="fn">str</span>, usd_per_million_tokens: <span class="fn">float</span>) -&gt; <span class="fn">dict</span>:
+    <span class="st">"""Estimate input cost before calling the API. Pass your model's current price."""</span>
+    n_tokens = <span class="fn">len</span>(enc.<span class="fn">encode</span>(text))
+    <span class="kw">return</span> {<span class="st">"tokens"</span>: n_tokens, <span class="st">"cost_usd"</span>: n_tokens / <span class="nm">1_000_000</span> * usd_per_million_tokens}
+
+<span class="fn">print</span>(<span class="fn">estimate_cost</span>(<span class="st">"Tokenisation is the first step in every LLM pipeline."</span>, usd_per_million_tokens=<span class="nm">5.0</span>))
+<span class="out"># {'tokens': 12, 'cost_usd': 6e-05}</span>
+
+<span class="cm"># For a 25,000-token document at the same rate: 25,000 / 1,000,000 x $5 = $0.125 per call.</span>
+<span class="cm"># Sent 10,000 times a day, that's $1,250 a day. Worth optimising.</span></pre></div>
+
+    <div class="aside">
+      <span class="label">Engineer's rule</span>
+      <p>Always measure the token count <em>before</em> you send a request, not after. Monitoring afterwards tells you what you spent. Measuring beforehand lets you trim, truncate, or warn the user before you burn tokens or blow through the context limit.</p>
+    </div>
+  </section>
+
+  <section id="s6">
+    <h2><span class="part">§ 06 · Hands-on Code</span>Exploring Hugging Face Tokenisers</h2>
+
+    <p>When you move from OpenAI's API to open models like BERT, T5, Llama, or Mistral, you'll use Hugging Face's <code>transformers</code> library. The interface is almost the same as tiktoken. The important difference is that each model family splits text in its own way.</p>
+
+    <div class="codewrap"><div class="codehead"><span>Bash</span><span>setup</span></div><pre><span class="pmt">$</span> pip install transformers sentencepiece</pre></div>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>WordPiece (BERT) vs SentencePiece (T5)</span></div><pre><span class="kw">from</span> transformers <span class="kw">import</span> AutoTokenizer
+
+<span class="cm"># BERT uses WordPiece: "##" marks a piece that continues the previous one</span>
+bert_tok = AutoTokenizer.<span class="fn">from_pretrained</span>(<span class="st">"bert-base-uncased"</span>)
+<span class="fn">print</span>(bert_tok.<span class="fn">tokenize</span>(<span class="st">"Tokenisation is fascinating"</span>))
+
+<span class="cm"># T5 uses SentencePiece: "▁" marks where a space was</span>
+t5_tok = AutoTokenizer.<span class="fn">from_pretrained</span>(<span class="st">"t5-small"</span>)
+<span class="fn">print</span>(t5_tok.<span class="fn">tokenize</span>(<span class="st">"Tokenisation is fascinating"</span>))</pre></div>
+
+    <p>Run it and look for the markers: BERT's pieces that continue a word start with <code>##</code>, and T5's pieces that start a new word begin with <code>▁</code>. The exact splits depend on each model's learned vocabulary, which is the whole point: the same sentence gets carved up differently by each family.</p>
+
+    <div class="note">
+      <span class="label">Two practical gotchas</span>
+      <p>First, some model repositories are <strong>gated</strong>. Llama models, for example, require you to accept Meta's licence on Hugging Face and log in with an access token before <code>from_pretrained</code> will download them. Start with ungated models like <code>bert-base-uncased</code> and <code>t5-small</code> while you learn.</p>
+      <p>Second, <code>tok.encode(...)</code> usually adds <strong>special tokens</strong>: BERT wraps text in <code>[CLS]</code> and <code>[SEP]</code>, and T5 appends <code>&lt;/s&gt;</code>. Use <code>tok.tokenize(...)</code> to see only the text pieces, and remember the special tokens count towards the model's limit.</p>
+    </div>
+
+    <h3>Same sentence, different counts</h3>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>compare token counts across model families</span></div><pre>sentence = <span class="st">"The Generative AI revolution is transforming software engineering."</span>
+
+<span class="kw">for</span> model_name <span class="kw">in</span> [<span class="st">"bert-base-uncased"</span>, <span class="st">"gpt2"</span>, <span class="st">"t5-small"</span>]:
+    tok = AutoTokenizer.<span class="fn">from_pretrained</span>(model_name)
+    <span class="fn">print</span>(<span class="st">f"{model_name:18s} → {len(tok.tokenize(sentence)):3d} tokens"</span>)</pre></div>
+
+    <p>On plain English like this, the counts land close together. Try it again with a Hindi or Tamil sentence, or a block of code, and the gaps open up quickly. That's the pattern Figure 5 measures in the next section.</p>
+  </section>
+
+  <section id="s7">
+    <h2><span class="part">§ 07 · Engineering Judgement</span>What This Means for GenAI Engineers</h2>
+
+    <p>Theory only matters if it changes how you build. Here's what token awareness looks like in day-to-day engineering.</p>
+
+    <h3>1. Context window management</h3>
+    <p>Every LLM has a hard ceiling on the number of tokens it can handle in one call. The limit varies by model and keeps growing as providers ship longer-context versions, so check the documentation for the one you use. The ceiling covers everything: your instructions, your few-shot examples (Article #01, §16), any retrieved documents, the conversation so far, and the model's reply.</p>
+
+    <p>Think of packing a suitcase with a strict weight limit. Every item (instructions, examples, documents) has a weight in tokens. Common short words pack efficiently, while rare words, code, and non-English text take up more room. Once you hit the limit, nothing else fits, however important it is. When you build RAG systems (Phase 5), measure each chunk's token count before assembling the prompt, so you know it fits before you try to close the suitcase.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 4</span><span>A context window budget</span></div><div class="body"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><text x="16" y="24" font-size="12" font-weight="700" fill="#101C19">A typical RAG call inside a 128k-token context window</text><rect x="16.0" y="44" width="5.2" height="44" fill="#33443F"/><rect x="21.2" y="44" width="10.4" height="44" fill="#8A5E0F"/><rect x="31.7" y="44" width="130.5" height="44" fill="#0E6E62"/><rect x="162.1" y="44" width="5.2" height="44" fill="#2A9D8F"/><rect x="167.3" y="44" width="10.4" height="44" fill="#1B6B4C"/><rect x="177.8" y="44" width="506.2" height="44" fill="#E9EDEB" stroke="#B4C0BC"/><text x="430.9" y="71" text-anchor="middle" font-size="13" font-weight="600" fill="#5C6B66">97k tokens still free</text><text x="16" y="106" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">0</text><text x="177.8" y="106" text-anchor="middle" font-size="10" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">31k used</text><text x="684" y="106" text-anchor="end" font-size="10" fill="#5C6B66" style="font-family:'IBM Plex Mono',monospace">128k</text><rect x="16" y="136" width="12" height="12" fill="#33443F"/><text x="34" y="146" font-size="11" fill="#101C19">System prompt</text><text x="216" y="146" text-anchor="end" font-size="11" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">1k</text><rect x="242" y="136" width="12" height="12" fill="#8A5E0F"/><text x="260" y="146" font-size="11" fill="#101C19">Few-shot examples</text><text x="442" y="146" text-anchor="end" font-size="11" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">2k</text><rect x="468" y="136" width="12" height="12" fill="#0E6E62"/><text x="486" y="146" font-size="11" fill="#101C19">Retrieved documents</text><text x="668" y="146" text-anchor="end" font-size="11" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">25k</text><rect x="16" y="166" width="12" height="12" fill="#2A9D8F"/><text x="34" y="176" font-size="11" fill="#101C19">Question + history</text><text x="216" y="176" text-anchor="end" font-size="11" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">1k</text><rect x="242" y="166" width="12" height="12" fill="#1B6B4C"/><text x="260" y="176" font-size="11" fill="#101C19">Reserved for the reply</text><text x="442" y="176" text-anchor="end" font-size="11" font-weight="600" fill="#101C19" style="font-family:'IBM Plex Mono',monospace">2k</text><text x="350" y="222" text-anchor="middle" font-size="10.5" fill="#5C6B66">Illustrative budget. Everything, including the model's answer, has to fit. Context limits vary by model, so check yours.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>Retrieved documents usually dominate. Know what you're spending before you send.</figcaption></figure>
+
+    <h3>2. API cost forecasting</h3>
+    <p>APIs charge separately for input and output tokens, and prices differ a lot between models. As a rough guide, a 50-page document is somewhere around 25,000–35,000 tokens, depending on how dense the text is. At an example rate of $5 per million input tokens, 25,000 tokens costs about $0.125 per call, and 10,000 calls a day comes to $1,250 a day. Check your provider's current pricing page for real figures; prices are among the fastest-changing numbers in the industry. Concise prompts and sensible chunking are engineering decisions, not just style.</p>
+
+    <h3>3. Prompt design</h3>
+    <p>Every word in your system prompt costs tokens, on every single call. Long, rambling instructions aren't just inelegant; they cost money and use up space that could hold user data or retrieved documents. Few-shot examples are powerful but token-heavy, so choose them carefully. Sometimes one well-chosen example beats three mediocre ones.</p>
+
+    <h3>4. Multilingual apps</h3>
+    <p>This one matters a lot for Indian-language products. Tokenisers learn from their training text, and older ones saw mostly English. Figure 5 shows the same sentence measured in four languages.</p>
+
+    <figure class="exhibit"><div class="head"><span>Figure 5</span><span>Token efficiency across languages and content types</span></div><div class="body"><svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Public Sans',-apple-system,sans-serif;" role="img"><text x="16" y="22" font-size="12" font-weight="700" fill="#101C19">Tokens needed for the same sentence</text><text x="16" y="38" font-size="10.5" font-style="italic" fill="#5C6B66">"The monsoon arrived early this year, so the farmers started sowing their fields."</text><rect x="300" y="12" width="12" height="12" fill="#B4C0BC"/><text x="318" y="22" font-size="10.5" fill="#101C19">cl100k_base (older, ~100k)</text><rect x="480" y="12" width="12" height="12" fill="#0E6E62"/><text x="498" y="22" font-size="10.5" fill="#101C19">o200k_base (newer, ~200k)</text><rect x="60" y="270.2" width="32" height="29.8" rx="2" fill="#B4C0BC"/><text x="76" y="264.2" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">17</text><rect x="98" y="270.2" width="32" height="29.8" rx="2" fill="#0E6E62"/><text x="114" y="264.2" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">17</text><text x="95" y="318" text-anchor="middle" font-size="12" font-weight="600" fill="#101C19">English</text><text x="95" y="334" text-anchor="middle" font-size="10" fill="#5C6B66">baseline</text><rect x="180" y="165.2" width="32" height="134.8" rx="2" fill="#B4C0BC"/><text x="196" y="159.2" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">77</text><rect x="218" y="261.5" width="32" height="38.5" rx="2" fill="#0E6E62"/><text x="234" y="255.5" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">22</text><text x="215" y="318" text-anchor="middle" font-size="12" font-weight="600" fill="#101C19">Hindi</text><text x="215" y="334" text-anchor="middle" font-size="10" fill="#5C6B66">4.5× → 1.3×</text><rect x="300" y="84.8" width="32" height="215.2" rx="2" fill="#B4C0BC"/><text x="316" y="78.8" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">123</text><rect x="338" y="245.8" width="32" height="54.2" rx="2" fill="#0E6E62"/><text x="354" y="239.8" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">31</text><text x="335" y="318" text-anchor="middle" font-size="12" font-weight="600" fill="#101C19">Tamil</text><text x="335" y="334" text-anchor="middle" font-size="10" fill="#5C6B66">7.2× → 1.8×</text><rect x="420" y="258.0" width="32" height="42.0" rx="2" fill="#B4C0BC"/><text x="436" y="252.0" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">24</text><rect x="458" y="270.2" width="32" height="29.8" rx="2" fill="#0E6E62"/><text x="474" y="264.2" text-anchor="middle" font-size="11" font-weight="600" fill="#101C19">17</text><text x="455" y="318" text-anchor="middle" font-size="12" font-weight="600" fill="#101C19">Chinese</text><text x="455" y="334" text-anchor="middle" font-size="10" fill="#5C6B66">1.4× → 1.0×</text><line x1="50" y1="300" x2="520" y2="300" stroke="#B4C0BC"/><rect x="540" y="60" width="148" height="250" rx="3" fill="#fff" stroke="#D2DAD7"/><text x="614" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#101C19">Characters per token</text><text x="614" y="96" text-anchor="middle" font-size="9.5" fill="#5C6B66">(both encodings agree)</text><text x="554" y="126" font-size="10.5" fill="#101C19">English prose</text><rect x="554" y="134" width="94" height="14" rx="2" fill="#1B6B4C"/><text x="654" y="146" font-size="11" font-weight="600" fill="#101C19">4.7</text><text x="554" y="188" font-size="10.5" fill="#101C19">Python code</text><rect x="554" y="196" width="56" height="14" rx="2" fill="#8A5E0F"/><text x="616" y="208" font-size="11" font-weight="600" fill="#101C19">2.8</text><text x="554" y="250" font-size="10.5" fill="#101C19">Random ID</text><rect x="554" y="258" width="20" height="14" rx="2" fill="#B23A26"/><text x="580" y="270" font-size="11" font-weight="600" fill="#101C19">1.0</text><text x="350" y="350" text-anchor="middle" font-size="10.5" fill="#5C6B66">Measured with tiktoken. Fewer tokens for the same content means lower cost and more room in the context window.</text></svg></div><p class="swipe">← swipe to see the whole figure →</p><figcaption>With the older encoding, the Hindi sentence needs 4.5× as many tokens as the English one and Tamil needs 7.2×. The newer encoding cuts that to 1.3× and 1.8×. Same meaning, very different cost.</figcaption></figure>
+
+    <p>Two lessons follow. First, if you build for Hindi, Tamil, or other Indian languages, measure token counts in those languages; don't budget from English numbers. Second, the choice of model matters: newer tokenisers with bigger, more multilingual vocabularies can cut your costs for the same text by a factor of three or more. Models trained specifically for Indian languages can do better still.</p>
+
+    <h3>5. The letter-counting problem</h3>
+    <p>This isn't a bug that one patch will fix. It follows directly from subword tokenisation: the model sees IDs, not letters. Models have improved a lot at it, mainly by spelling words out before counting, but when your application needs reliable character-level work (counting letters, checking spelling patterns, validating formats), do it in ordinary code rather than asking the LLM.</p>
+  </section>
+
+  <section id="s8">
+    <h2><span class="part">§ 08 · Optional Deep Dive</span>Build a Tiny BPE Tokeniser from Scratch</h2>
+
+    <p>This section is for readers who want to fully demystify the algorithm. If the explanation in §03 was enough, feel free to skip it. But if you run this code, something will click that no explanation fully replaces.</p>
+
+    <div class="yt">
+      <span class="label">📹 YouTube note</span>
+      Keep this bonus segment under three minutes. Say: "This is all BPE is: a loop that counts pairs and merges the most common one. The difference between this and a real tokeniser is scale: ten merges versus a hundred thousand."
+    </div>
+
+    <div class="codewrap"><div class="codehead"><span>Python</span><span>BPE from scratch · about 30 lines</span></div><pre><span class="kw">import</span> re
+<span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">get_vocab</span>(corpus):
+    <span class="st">"""Split each word into characters plus an end-of-word marker, and count it."""</span>
+    vocab = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> word <span class="kw">in</span> corpus:
+        vocab[<span class="st">' '</span>.<span class="fn">join</span>(word) + <span class="st">' &lt;/w&gt;'</span>] += <span class="nm">1</span>
+    <span class="kw">return</span> vocab
+
+<span class="kw">def</span> <span class="fn">get_pairs</span>(vocab):
+    <span class="st">"""Count every pair of neighbouring symbols, weighted by word frequency."""</span>
+    pairs = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> word, freq <span class="kw">in</span> vocab.<span class="fn">items</span>():
+        symbols = word.<span class="fn">split</span>()
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(symbols) - <span class="nm">1</span>):
+            pairs[(symbols[i], symbols[i + <span class="nm">1</span>])] += freq
+    <span class="kw">return</span> pairs
+
+<span class="kw">def</span> <span class="fn">merge_vocab</span>(pair, vocab):
+    <span class="st">"""Merge every occurrence of the pair, matching whole symbols only."""</span>
+    pattern = re.<span class="fn">compile</span>(<span class="st">r'(?&lt;!\S)'</span> + re.<span class="fn">escape</span>(<span class="st">' '</span>.<span class="fn">join</span>(pair)) + <span class="st">r'(?!\S)'</span>)
+    <span class="kw">return</span> {pattern.<span class="fn">sub</span>(<span class="st">''</span>.<span class="fn">join</span>(pair), word): freq <span class="kw">for</span> word, freq <span class="kw">in</span> vocab.<span class="fn">items</span>()}
+
+<span class="cm"># The toy corpus from §03, with word counts</span>
+corpus = [<span class="st">'low'</span>] * <span class="nm">5</span> + [<span class="st">'lower'</span>] * <span class="nm">2</span> + [<span class="st">'newest'</span>] * <span class="nm">6</span> + [<span class="st">'widest'</span>] * <span class="nm">3</span>
+vocab = <span class="fn">get_vocab</span>(corpus)
+
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">10</span>):
+    pairs = <span class="fn">get_pairs</span>(vocab)
+    <span class="kw">if not</span> pairs:
+        <span class="kw">break</span>
+    best = <span class="fn">max</span>(pairs, key=pairs.get)
+    <span class="fn">print</span>(<span class="st">f"Merge {i+1:2d}: {best[0]:5s} + {best[1]:5s} → {''.join(best):9s} (seen {pairs[best]}×)"</span>)
+    vocab = <span class="fn">merge_vocab</span>(best, vocab)</pre></div>
+
+    <div class="codewrap"><div class="codehead"><span>Output</span><span>what you'll see</span></div><pre><span class="out">Merge  1: e     + s     → es        (seen 9×)
+Merge  2: es    + t     → est       (seen 9×)
+Merge  3: est   + &lt;/w&gt;  → est&lt;/w&gt;   (seen 9×)
+Merge  4: l     + o     → lo        (seen 7×)
+Merge  5: lo    + w     → low       (seen 7×)
+Merge  6: n     + e     → ne        (seen 6×)
+Merge  7: ne    + w     → new       (seen 6×)
+Merge  8: new   + est&lt;/w&gt; → newest&lt;/w&gt; (seen 6×)
+Merge  9: low   + &lt;/w&gt;  → low&lt;/w&gt;   (seen 5×)
+Merge 10: w     + i     → wi        (seen 3×)</span></pre></div>
+
+    <div class="note">
+      <span class="label">Why the regular expression?</span>
+      <p>Many online versions of this code merge with a plain <code>word.replace("e s", "es")</code>. That has a subtle bug: it can match across symbol boundaries. If a word contains the symbols <code>ne</code> and <code>s</code>, the text <code>"ne s"</code> contains <code>"e s"</code>, and a plain replace would wrongly glue them together. The pattern above only matches complete symbols, which is how the original research code does it.</p>
+    </div>
+
+    <p>Read through the output and you'll see the algorithm discovering that <code>-est</code> and <code>low</code> are valuable units without being told anything about English grammar. It all comes from frequency. The only real difference between this and the tokeniser inside a GPT model is scale: <code>cl100k_base</code> holds about 100,000 learned tokens, built by running the same kind of loop over an enormous amount of text.</p>
+  </section>
+
+  <section id="s9">
+    <h2><span class="part">§ 09 · Summary</span>What You Now Know</h2>
+    <div class="pathbox summary">
+      <h4>Seven things to take with you</h4>
+      <ul>
+        <li><strong>Tokens are subword units,</strong> the actual input and output of every LLM. Not words, not characters, but something in between.</li>
+        <li><strong>BPE learns its vocabulary from data</strong> by repeatedly merging the most frequent pair, so common patterns get single tokens and rare ones get split.</li>
+        <li><strong>WordPiece (BERT) and SentencePiece (T5, Gemma)</strong> are related approaches used by other model families. <code>AutoTokenizer</code> picks the right one, but token counts differ.</li>
+        <li><strong>tiktoken counts tokens for OpenAI models; AutoTokenizer does it for Hugging Face models.</strong> Both encode, decode, and count.</li>
+        <li><strong>Token counts drive context usage, cost, and some model limitations.</strong> Measure before you send.</li>
+        <li><strong>The letter-counting problem comes from tokenisation itself.</strong> The model sees IDs, not letters, so do character-level work in code.</li>
+        <li><strong>Non-English text can cost several times more tokens,</strong> especially with older encodings (Hindi 4.5× and Tamil 7.2× in our test). Newer, larger vocabularies narrow the gap a lot. Measure in your users' languages.</li>
+      </ul>
+    </div>
+
+    <div class="pathbox" id="exercise">
+      <h4>📝 Learner exercise</h4>
+      <ol>
+        <li><strong>Measure your own text.</strong> Take a paragraph from your current project (documentation, a code comment, a news article). Count its tokens with both <code>cl100k_base</code> and <code>o200k_base</code>.</li>
+        <li><strong>Estimate the cost</strong> with <code>estimate_cost()</code>, using the current price of a model you'd actually call.</li>
+        <li><strong>Rewrite and re-measure.</strong> Rewrite the paragraph to say the same thing in fewer words, then measure how many tokens you saved.</li>
+        <li><strong>Try your language.</strong> Translate one sentence into Hindi, Tamil, or another language you know and compare the counts across both encodings. The goal is a felt sense of token density, the way a good engineer has a feel for memory use.</li>
+      </ol>
+    </div>
+
+    <div class="decision" id="next">
+      <span class="id">Next in the series → Article #04</span>
+      <h5>Embeddings from Scratch</h5>
+      <p>We now know how text becomes tokens. Next: how tokens become the vectors that capture meaning. Why "king" and "queen" sit close together in vector space, why "Paris" minus "France" plus "Germany" lands near "Berlin", and how the same idea powers search, RAG, and recommendation systems. Embeddings are the foundation of how machines represent meaning.</p>
+    </div>
+  </section>
+
+<footer>
+  <p><em>Code not working? Put your error in the comments. Found a better analogy? Share it. If this clicked for you, send it to someone who's been confused by the word "token" for months.</em></p>
+  <p>Generative AI Engineer Series · Article #03 · Phase 1: Foundations</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var rail = document.getElementById('rail');
+  var btn = document.getElementById('railToggle');
+  if (btn && rail) {
+    btn.addEventListener('click', function(){
+      var open = rail.getAttribute('data-open') === 'true';
+      rail.setAttribute('data-open', open ? 'false' : 'true');
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      btn.textContent = open ? 'Show contents' : 'Hide contents';
+    });
+    rail.addEventListener('click', function(e){
+      if (e.target.closest('a') && window.innerWidth < 1080) {
+        rail.setAttribute('data-open', 'false');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.textContent = 'Show contents';
+      }
+    });
+  }
+  // theme switcher: auto -> light -> dark
+  var tb = document.getElementById('themeBtn');
+  var modes = ['auto', 'light', 'dark'], i = 0;
+  if (tb) tb.addEventListener('click', function(){
+    i = (i + 1) % 3;
+    if (modes[i] === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', modes[i]);
+    tb.textContent = 'Theme: ' + modes[i];
+  });
+  // highlight the current section in the rail
+  var links = {};
+  document.querySelectorAll('.rail a[href^="#s"]').forEach(function(a){ links[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting && links[en.target.id]) {
+          Object.values(links).forEach(function(a){ a.classList.remove('on'); });
+          links[en.target.id].classList.add('on');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('main section[id]').forEach(function(s){ io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
