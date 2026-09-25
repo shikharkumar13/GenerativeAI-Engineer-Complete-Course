@@ -1,8 +1,6 @@
 ## Generative AI Engineer Series
  
-A practical, code-first curriculum for becoming a Generative AI Engineer — from
-transformers and embeddings through LangChain, RAG, and LangGraph agents — in 42
-articles across 7 phases, each paired with a short companion video.
+A practical, code-first curriculum for becoming a Generative AI Engineer; from transformers and embeddings through LangChain, RAG, and LangGraph agents, in 42 articles across 7 phases, each paired with a short companion video.
  
 ![Articles](https://img.shields.io/badge/articles-42-2F6FED)
 ![Phases](https://img.shields.io/badge/phases-7-7C3AED)
@@ -25,7 +23,6 @@ articles across 7 phases, each paired with a short companion video.
   - [Phase 6: LangGraph & Agentic AI](#phase-6-langgraph--agentic-ai)
   - [Phase 7: Deployment & Capstone Projects](#phase-7-deployment--capstone-projects)
   - [Bonus capstone projects](#bonus-capstone-projects)
-- [Progress](#progress)
 - [Repository layout](#repository-layout)
 - [Where to go next](#where-to-go-next)
 - [Notes](#notes)
@@ -33,22 +30,13 @@ articles across 7 phases, each paired with a short companion video.
  
 ## What this is
  
-42 articles, organized into 7 phases, taking a reader from "what is generative AI"
-to shipping a deployed, agentic RAG application. Every phase builds on the one
-before it — embeddings before vector databases, vector databases before RAG,
-chains before agents — so the series is meant to be read in order rather than
-sampled topic by topic.
+42 articles, organized into 7 phases, taking a reader from "what is generative AI" to shipping a deployed, agentic RAG application. Every phase builds on the one before it for example, embeddings before vector databases, vector databases before RAG, chains before agents, so the series is meant to be read in order rather than sampled topic by topic.
  
-Each article follows the same shape: the concept explained in plain language first,
-then a full, runnable implementation. Nothing is left as "an exercise for the
-reader" — every idea introduced gets code that actually produces it.
+Each article follows the same shape: the concept explained in plain language first, then a full, runnable implementation. Nothing is left as "an exercise for the reader"; every idea introduced gets code that actually produces it.
  
 ### Who it's for
  
-New data science and machine learning learners moving into generative AI
-engineering. It assumes the fundamentals covered in a prior Machine Learning
-series — Python, core ML concepts, and basic model training — but no prior
-exposure to LLMs, LangChain, or vector databases.
+New data science and machine learning learners moving into generative AI engineering. It assumes the basic knowledge of Python, Machine Learning, Model training but no prior exposure to LLMs, LangChain, or vector databases.
  
 ### What you need
  
@@ -63,7 +51,7 @@ exposure to LLMs, LangChain, or vector databases.
 Every numbered article in the tables below ships as:
  
 - a **written article** (theory plus a complete, working implementation), and
-- a **5–10 minute video** covering the same material.
+- a **video** covering the same material.
 Each article also carries a format tag:
  
 | Tag | Meaning |
@@ -82,7 +70,7 @@ Bridging machine learning into generative AI — the concepts every later phase 
  
 | # | Topic | Format | Article | Video |
 | --- | --- | --- | --- | --- |
-| 01 | **What is Generative AI?**<br>Discriminative vs. generative models, types of GenAI, real-world use cases | `Theory` | *Coming soon* | *Coming soon* |
+| 01 | **What is Generative AI**<br>Discriminative vs. generative models, types of GenAI, real-world use cases | `Theory` | *Coming soon* | *Coming soon* |
 | 02 | **The Transformer architecture**<br>Why transformers replaced RNNs, self-attention intuition, encoder vs. decoder | `Theory` | *Coming soon* | *Coming soon* |
 | 03 | **Tokenization explained**<br>BPE, WordPiece, SentencePiece, building a tokenizer from scratch, token costs | `Hands-on` | *Coming soon* | *Coming soon* |
 | 04 | **Embeddings from scratch**<br>Word2Vec intuition, sentence embeddings, visualizing embedding space | `Hands-on` | *Coming soon* | *Coming soon* |
@@ -224,7 +212,7 @@ code for that article without hunting for dependencies elsewhere.
 ## Where to go next
  
 This series assumes a prior Machine Learning series as its foundation and ends
-with a deployed, agentic RAG application. From here, natural next steps are:
+with a deployed, agentic RAG application. If you know basic fundamentals of Machine Learning and Deep Learning, natural next steps are:
  
 1. **This series.** Generative AI fundamentals through LangChain, RAG, and LangGraph.
 2. **The bonus capstone projects.** Three additional builds to round out a portfolio.
@@ -234,8 +222,7 @@ with a deployed, agentic RAG application. From here, natural next steps are:
  
 ## Notes
  
-- Articles are added to the tables above as they are published — the checkboxes
-  in [Progress](#progress) reflect current status.
+- Articles are added to the tables above as they are published.
 - The series is meant to be followed in phase order: later phases assume the
   vocabulary and code from earlier ones (Phase 5's RAG pipeline reuses the vector
   stores from Phase 3 and the chains from Phase 4, for example).
